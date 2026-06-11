@@ -1,0 +1,18 @@
+{
+    "proyecto_slug": "el-efecto-ajedrez-mentores-al-rev-es-a09cccab",
+    "version": "1.0.0",
+    "arquitectura": {
+        "backend": "no_definido",
+        "frontend": "no_definido",
+        "base_datos": "no_definido",
+        "entorno": "desarrollo"
+    },
+    "modulos": [],
+    "artefactos": [
+        "api",
+        "CORE",
+        "public",
+        "knowledge"
+    ],
+    "generado_at": "2026-06-11T07:53:16+02:00"
+}

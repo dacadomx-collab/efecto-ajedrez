@@ -1,0 +1,11 @@
+{
+    "blueprint_generado": true,
+    "blueprint_path": "C:\\AXON_WORKSPACE\\ws_5fe86a02-fe92-461a-b4a7-3838d0241225\\fase_2_diseno\\blueprint.json",
+    "arquitectura": {
+        "backend": "no_definido",
+        "frontend": "no_definido",
+        "base_datos": "no_definido",
+        "entorno": "desarrollo"
+    },
+    "modulos_count": 0
+}

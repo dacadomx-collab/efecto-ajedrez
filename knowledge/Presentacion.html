@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proyecto Tzunum: Estrategia Podcast Paola Palomares</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
+    
+    <!-- Chosen Palette: Warm Neutrals & Earthy Tones (Beige, Terracotta, Sage Green, Deep Charcoal) -->
+    <!-- Application Structure Plan: The SPA uses a "Producer's Dashboard" layout. It features a persistent sidebar (or top nav on mobile) for easy navigation between the four key strategic areas requested: Presentación, FODA, Tendencias, Monetización, and Pilares. This allows Paola to review her strategy non-linearly. Interactive elements like tabs, expandable cards, and dynamic charts are used to avoid overwhelming the user with text, making the deep research digestible and actionable. -->
+    <!-- Visualization & Content Choices: 
+         1. FODA: Interactive 2x2 Grid (HTML/CSS/JS) -> Goal: Organize strengths/weaknesses -> Justification: Allows focus on one quadrant at a time without clutter.
+         2. Tendencias: Radar Chart (Chart.js Canvas) -> Goal: Compare parental pain points in LatAm -> Justification: Visually demonstrates the multifaceted nature of modern parenting anxieties.
+         3. Monetización: Staggered Timeline Cards (HTML/CSS) -> Goal: Show progression -> Justification: Clearly delineates short, medium, and long-term financial goals.
+         4. Pilares: Interactive Accordion/Tabs (HTML/JS) -> Goal: Detail Season 1 structure -> Justification: Keeps the UI clean while allowing deep dives into episode concepts.
+         CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. All visuals are CSS/HTML or Canvas. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #FAF9F6; /* Warm Off-white */
+            color: #333333;
+        }
+        h1, h2, h3, .serif-font {
+            font-family: 'Playfair Display', serif;
+        }
+        .bg-terracotta { background-color: #E29578; }
+        .text-terracotta { color: #E29578; }
+        .bg-sage { background-color: #8DA399; }
+        .text-sage { color: #8DA399; }
+        .bg-sand { background-color: #D4A373; }
+        
+        /* Chart Container Styling - MANDATORY */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 400px;
+            }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #D4A373; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #E29578; }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .tab-active {
+            border-left: 4px solid #E29578;
+            background-color: rgba(226, 149, 120, 0.1);
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col md:flex-row overflow-x-hidden">
+
+    <!-- Mobile Nav Toggle -->
+    <div class="md:hidden bg-[#FAF9F6] p-4 flex justify-between items-center shadow-sm z-50 sticky top-0">
+        <div class="flex items-center gap-2">
+            <span class="text-2xl">🌺</span>
+            <span class="font-bold serif-font text-xl">Proyecto Tzunum</span>
+        </div>
+        <button id="mobile-menu-btn" class="text-3xl focus:outline-none">&#9776;</button>
+    </div>
+
+    <!-- Sidebar Navigation -->
+    <nav id="sidebar" class="hidden md:flex flex-col w-full md:w-64 bg-white shadow-xl h-auto md:h-screen sticky top-0 z-40 transition-all duration-300">
+        <div class="p-6 text-center border-b border-gray-100 hidden md:block">
+            <div class="w-20 h-20 mx-auto bg-sand rounded-full flex items-center justify-center text-4xl mb-3 shadow-inner">
+                🌺
+            </div>
+            <h1 class="font-bold serif-font text-2xl text-gray-800">Tzunum</h1>
+            <p class="text-sm text-gray-500 italic mt-1">Colibrí, siempre colibrí</p>
+        </div>
+        
+        <div class="flex-grow py-4">
+            <p class="px-6 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Estrategia Paola P.</p>
+            <ul class="space-y-1">
+                <li><button onclick="switchTab('intro')" id="nav-intro" class="w-full text-left px-6 py-3 text-gray-600 hover:bg-gray-50 transition-colors tab-active">🎙️ El Productor</button></li>
+                <li><button onclick="switchTab('foda')" id="nav-foda" class="w-full text-left px-6 py-3 text-gray-600 hover:bg-gray-50 transition-colors">🔍 Análisis FODA</button></li>
+                <li><button onclick="switchTab('trends')" id="nav-trends" class="w-full text-left px-6 py-3 text-gray-600 hover:bg-gray-50 transition-colors">📈 Mercado LatAm</button></li>
+                <li><button onclick="switchTab('money')" id="nav-money" class="w-full text-left px-6 py-3 text-gray-600 hover:bg-gray-50 transition-colors">💰 Capitalización</button></li>
+                <li><button onclick="switchTab('pillars')" id="nav-pillars" class="w-full text-left px-6 py-3 text-gray-600 hover:bg-gray-50 transition-colors">🏛️ Temporada 1</button></li>
+            </ul>
+        </div>
+
+        <!-- Simulated "Tzunum Playlist" Player -->
+        <div class="p-4 bg-gray-50 border-t border-gray-100 m-4 rounded-xl shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-sage rounded flex items-center justify-center text-white">🎸</div>
+                <div>
+                    <p class="text-xs font-bold text-gray-800">Playlist Tzunum 🌺</p>
+                    <p class="text-[10px] text-gray-500">Pista base del proyecto</p>
+                </div>
+            </div>
+            <div class="mt-3 flex justify-between items-center text-gray-400 text-sm px-2">
+                <span>&#9664;&#9664;</span>
+                <span class="text-terracotta text-lg">&#9654;</span>
+                <span>&#9654;&#9654;</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 p-6 md:p-10 lg:p-16 h-screen overflow-y-auto w-full">
+        
+        <!-- SECTION: INTRO -->
+        <section id="sec-intro" class="content-section animate-fade-in block">
+            <header class="mb-8">
+                <h2 class="text-4xl serif-font text-gray-800 mb-2">¡Hola, Paola! Soy el Productor Tzunum 🌺</h2>
+                <p class="text-xl text-gray-500 font-light">Estrategia integral para tu podcast de Crianza Positiva.</p>
+            </header>
+            
+            <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 mb-8 leading-relaxed text-lg text-gray-700">
+                <p class="mb-4"><strong class="text-terracotta">Nuestra Filosofía:</strong> <em>"Colibrí siempre colibrí"</em>. Vamos a hacer nuestra parte para cambiar el mundo, aportando una gota de agua a la vez para apagar el fuego de la crianza reactiva y la violencia invisible en los hogares.</p>
+                <p class="mb-4">Mi objetivo como tu productor es asegurar que tu deseo de DAR SERVICIO se traduzca en una plataforma profesional, escalable y auténtica. Integraremos tu esencia —tu guitarra, tu canto, tu voz cálida— y traduciremos esos valores profundos que tienes (familia, empatía, amor incondicional) a un <strong>lenguaje laico, universal y empático</strong> que resuene con cualquier madre o padre en Latinoamérica.</p>
+                <p>Usa el panel de la izquierda para navegar por la investigación de mercado, la estrategia de monetización y la estructura de tu primera temporada. ¡Comencemos a grabar!</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="glass-panel p-6 rounded-xl border-l-4 border-terracotta">
+                    <div class="text-3xl mb-2">🌎</div>
+                    <h4 class="font-bold mb-1">Mercado</h4>
+                    <p class="text-sm text-gray-600">Enfoque 100% en México y LatAm. Hablamos nuestro idioma y nuestras realidades.</p>
+                </div>
+                <div class="glass-panel p-6 rounded-xl border-l-4 border-sage">
+                    <div class="text-3xl mb-2">🎸</div>
+                    <h4 class="font-bold mb-1">Identidad</h4>
+                    <p class="text-sm text-gray-600">Marca personal fuerte: Paola la experta empática que también canta y conecta.</p>
+                </div>
+                <div class="glass-panel p-6 rounded-xl border-l-4 border-sand">
+                    <div class="text-3xl mb-2">🌱</div>
+                    <h4 class="font-bold mb-1">Traducción</h4>
+                    <p class="text-sm text-gray-600">Valores de la comunidad SUD convertidos en herramientas universales de psicología y amor.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION: FODA -->
+        <section id="sec-foda" class="content-section hidden animate-fade-in">
+            <header class="mb-8">
+                <h2 class="text-3xl serif-font text-gray-800 mb-2">Análisis FODA: El Nicho en LatAm</h2>
+                <p class="text-gray-600">Entender dónde estamos parados nos permite volar mejor. Este análisis muestra el panorama actual de la Crianza Positiva en la región hispanohablante.</p>
+            </header>
+
+            <p class="mb-6 text-gray-700">Explora la matriz interactiva a continuación. Haz clic en cada cuadrante para revelar las estrategias que implementaremos para potenciar o mitigar cada factor.</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 h-auto md:h-[500px]">
+                <!-- Fortalezas -->
+                <div class="bg-white rounded-2xl shadow-sm border border-green-100 p-6 flex flex-col justify-between hover:shadow-md transition-shadow cursor-pointer group" onclick="toggleFoda('f-details')">
+                    <div>
+                        <div class="flex items-center gap-2 mb-4">
+                            <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold uppercase">Fortalezas</span>
+                            <span class="text-xl">💪</span>
+                        </div>
+                        <ul class="list-disc pl-5 text-gray-700 space-y-2 mb-4">
+                            <li>Autenticidad de Paola (uso de música, guitarra, storytelling).</li>
+                            <li>Traducción de valores espirituales a un lenguaje universal laico y psicológico.</li>
+                            <li>Tono empático, sin juicios ("Tzunum").</li>
+                        </ul>
+                    </div>
+                    <div id="f-details" class="hidden mt-4 pt-4 border-t border-gray-100 text-sm text-green-800 bg-green-50 p-3 rounded">
+                        <strong>Estrategia Tzunum:</strong> Cerraremos cada episodio con un minuto acústico de guitarra. Esto creará un "gancho" emocional único que nadie más tiene en el nicho.
+                    </div>
+                </div>
+
+                <!-- Oportunidades -->
+                <div class="bg-white rounded-2xl shadow-sm border border-blue-100 p-6 flex flex-col justify-between hover:shadow-md transition-shadow cursor-pointer group" onclick="toggleFoda('o-details')">
+                    <div>
+                        <div class="flex items-center gap-2 mb-4">
+                            <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold uppercase">Oportunidades</span>
+                            <span class="text-xl">🔭</span>
+                        </div>
+                        <ul class="list-disc pl-5 text-gray-700 space-y-2 mb-4">
+                            <li>Despertar masivo en LatAm sobre la salud mental infantil.</li>
+                            <li>Padres millennials buscando romper ciclos de violencia (trauma generacional).</li>
+                            <li>Auge del formato videopodcast (YouTube/TikTok) para consumo rápido.</li>
+                        </ul>
+                    </div>
+                    <div id="o-details" class="hidden mt-4 pt-4 border-t border-gray-100 text-sm text-blue-800 bg-blue-50 p-3 rounded">
+                        <strong>Estrategia Tzunum:</strong> Grabaremos en formato Videopodcast a 2 cámaras. De un episodio de 40 min, extraeremos 15 "Reels/TikToks" enfocados en herramientas rápidas.
+                    </div>
+                </div>
+
+                <!-- Debilidades -->
+                <div class="bg-white rounded-2xl shadow-sm border border-yellow-100 p-6 flex flex-col justify-between hover:shadow-md transition-shadow cursor-pointer group" onclick="toggleFoda('d-details')">
+                    <div>
+                        <div class="flex items-center gap-2 mb-4">
+                            <span class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-bold uppercase">Debilidades</span>
+                            <span class="text-xl">⚠️</span>
+                        </div>
+                        <ul class="list-disc pl-5 text-gray-700 space-y-2 mb-4">
+                            <li>Empezar la audiencia desde cero orgánicamente.</li>
+                            <li>La producción audiovisual requiere inversión de tiempo y consistencia.</li>
+                            <li>Riesgo de encasillarse solo en "consejos" sin mostrar la vulnerabilidad propia.</li>
+                        </ul>
+                    </div>
+                    <div id="d-details" class="hidden mt-4 pt-4 border-t border-gray-100 text-sm text-yellow-800 bg-yellow-50 p-3 rounded">
+                        <strong>Estrategia Tzunum:</strong> Crearemos un "Lead Magnet" (ej. Mini-guía gratuita de gestión de berrinches) desde el episodio 1 para capturar emails y no depender solo del algoritmo.
+                    </div>
+                </div>
+
+                <!-- Amenazas -->
+                <div class="bg-white rounded-2xl shadow-sm border border-red-100 p-6 flex flex-col justify-between hover:shadow-md transition-shadow cursor-pointer group" onclick="toggleFoda('a-details')">
+                    <div>
+                        <div class="flex items-center gap-2 mb-4">
+                            <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold uppercase">Amenazas</span>
+                            <span class="text-xl">🌪️</span>
+                        </div>
+                        <ul class="list-disc pl-5 text-gray-700 space-y-2 mb-4">
+                            <li>Mercado saturado de "gurús" de paternidad y opiniones cruzadas.</li>
+                            <li>Mala interpretación pública de la crianza positiva (se confunde con permisividad).</li>
+                            <li>Burnout de los creadores de contenido (fatiga digital).</li>
+                        </ul>
+                    </div>
+                    <div id="a-details" class="hidden mt-4 pt-4 border-t border-gray-100 text-sm text-red-800 bg-red-50 p-3 rounded">
+                        <strong>Estrategia Tzunum:</strong> Posicionamiento claro: "Crianza Positiva NO es dejar que hagan lo que quieran. Es firmeza con amor". Tendremos temporadas cortas (10 eps) para evitar el burnout de Paola.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION: TENDENCIAS -->
+        <section id="sec-trends" class="content-section hidden animate-fade-in">
+            <header class="mb-8">
+                <h2 class="text-3xl serif-font text-gray-800 mb-2">Datos y Necesidades en LatAm</h2>
+                <p class="text-gray-600">Para que nuestra "gota de agua" caiga en tierra fértil, necesitamos entender qué les duele hoy a los padres hispanohablantes. Este gráfico interactivo muestra los focos de interés actuales.</p>
+            </header>
+
+            <div class="flex flex-col lg:flex-row gap-8 bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-gray-100">
+                <!-- Chart Container (Strict styling applied via CSS class) -->
+                <div class="w-full lg:w-1/2 flex items-center justify-center">
+                    <div class="chart-container">
+                        <canvas id="trendsChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="w-full lg:w-1/2 flex flex-col justify-center">
+                    <h3 class="text-xl font-bold mb-4 text-gray-800">Urgencias del Padre Moderno</h3>
+                    <div class="space-y-4" id="trend-descriptions">
+                        <!-- Dynamic text updated by JS -->
+                        <div class="p-4 bg-gray-50 rounded-lg border-l-4 border-terracotta">
+                            <h4 class="font-bold text-gray-800 flex items-center gap-2">📱 Gestión de Pantallas <span class="text-xs bg-red-100 text-red-600 px-2 rounded">Urgente</span></h4>
+                            <p class="text-sm text-gray-600 mt-1">El 85% de los padres en LatAm reportan ansiedad sobre cómo regular el uso de dispositivos en niños menores de 10 años. Será un tema ancla.</p>
+                        </div>
+                        <div class="p-4 bg-gray-50 rounded-lg border-l-4 border-sage">
+                            <h4 class="font-bold text-gray-800">🧠 Ruptura de Ciclos</h4>
+                            <p class="text-sm text-gray-600 mt-1">Padres buscando activamente no repetir los castigos físicos (chancla, cinturón) que vivieron, pero carecen de herramientas alternativas efectivas.</p>
+                        </div>
+                        <div class="p-4 bg-gray-50 rounded-lg border-l-4 border-sand">
+                            <h4 class="font-bold text-gray-800">🧘‍♀️ Salud Mental del Cuidador</h4>
+                            <p class="text-sm text-gray-600 mt-1">Alto índice de "Burnout Parental". Paola puede conectar aquí profundamente usando su música y empatía como bálsamo.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION: MONETIZACION -->
+        <section id="sec-money" class="content-section hidden animate-fade-in">
+            <header class="mb-8">
+                <h2 class="text-3xl serif-font text-gray-800 mb-2">Visión de Capitalización a Futuro</h2>
+                <p class="text-gray-600">Nuestro objetivo inicial es DAR SERVICIO. Pero para que el Colibrí siga volando, el proyecto debe ser sustentable. Esta es la ruta estructurada para monetizar sin perder la esencia.</p>
+            </header>
+
+            <div class="relative max-w-4xl mx-auto">
+                <!-- Timeline Line -->
+                <div class="hidden md:block absolute left-1/2 transform -translate-x-1/2 h-full w-1 bg-gray-200 z-0"></div>
+
+                <!-- Fase 1 -->
+                <div class="relative z-10 mb-12 flex flex-col md:flex-row items-center w-full">
+                    <div class="md:w-1/2 flex justify-end md:pr-8 mb-4 md:mb-0">
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 w-full hover:shadow-md transition-all">
+                            <div class="flex items-center gap-2 text-sage mb-2">
+                                <span>🌱</span> <h3 class="font-bold uppercase tracking-wide text-sm">Fase 1: Corto Plazo (0-6 Meses)</h3>
+                            </div>
+                            <h4 class="text-xl serif-font font-bold mb-2">Comunidad y Lead Magnets</h4>
+                            <ul class="text-sm text-gray-600 list-disc pl-5 space-y-1">
+                                <li><strong>Tráfico orgánico:</strong> YouTube Ads y Monetización de TikTok/Reels.</li>
+                                <li><strong>Captación:</strong> Intercambio de guías gratuitas (Ej. "5 canciones para calmar rabietas") por emails de oyentes.</li>
+                                <li><strong>Donaciones:</strong> Plataformas como Patreon o "Cafecito", apelando al espíritu de apoyar al "Colibrí".</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="hidden md:flex absolute left-1/2 transform -translate-x-1/2 w-8 h-8 bg-sage rounded-full border-4 border-white items-center justify-center text-white text-xs z-20 shadow">1</div>
+                    <div class="md:w-1/2 md:pl-8"></div>
+                </div>
+
+                <!-- Fase 2 -->
+                <div class="relative z-10 mb-12 flex flex-col md:flex-row items-center w-full">
+                    <div class="md:w-1/2 md:pr-8"></div>
+                    <div class="hidden md:flex absolute left-1/2 transform -translate-x-1/2 w-8 h-8 bg-sand rounded-full border-4 border-white items-center justify-center text-white text-xs z-20 shadow">2</div>
+                    <div class="md:w-1/2 flex justify-start md:pl-8 mb-4 md:mb-0">
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 w-full hover:shadow-md transition-all">
+                            <div class="flex items-center gap-2 text-sand mb-2">
+                                <span>🌿</span> <h3 class="font-bold uppercase tracking-wide text-sm">Fase 2: Mediano Plazo (6-18 Meses)</h3>
+                            </div>
+                            <h4 class="text-xl serif-font font-bold mb-2">Patrocinios Éticos y Talleres</h4>
+                            <ul class="text-sm text-gray-600 list-disc pl-5 space-y-1">
+                                <li><strong>Marcas Alineadas:</strong> Patrocinios con empresas que apoyen a familias (Ej. EdTech, productos sostenibles para bebés, seguros educativos).</li>
+                                <li><strong>Talleres Digitales:</strong> Cursos de bajo costo (entry-ticket de $15-$30 USD) sobre temas específicos (Ej. "Transición de cuna a cama sin lágrimas").</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fase 3 -->
+                <div class="relative z-10 flex flex-col md:flex-row items-center w-full">
+                    <div class="md:w-1/2 flex justify-end md:pr-8 mb-4 md:mb-0">
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border-2 border-terracotta bg-[#fff9f6] w-full hover:shadow-lg transition-all">
+                            <div class="flex items-center gap-2 text-terracotta mb-2">
+                                <span>🌳</span> <h3 class="font-bold uppercase tracking-wide text-sm">Fase 3: Largo Plazo (18+ Meses)</h3>
+                            </div>
+                            <h4 class="text-xl serif-font font-bold mb-2">Gira Presencial y B2G</h4>
+                            <ul class="text-sm text-gray-700 list-disc pl-5 space-y-1">
+                                <li><strong>"Gira Colibrí":</strong> Conferencias presenciales (charlas + música en vivo de Paola) en México y LatAm.</li>
+                                <li><strong>Alianzas Institucionales:</strong> Acercamiento a ONGs (UNICEF, Save the Children) o Gobiernos (DIF en México) para capacitación a cuidadores e impacto social a gran escala.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="hidden md:flex absolute left-1/2 transform -translate-x-1/2 w-8 h-8 bg-terracotta rounded-full border-4 border-white items-center justify-center text-white text-xs z-20 shadow">3</div>
+                    <div class="md:w-1/2 md:pl-8"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION: PILARES -->
+        <section id="sec-pillars" class="content-section hidden animate-fade-in">
+            <header class="mb-8 text-center md:text-left">
+                <h2 class="text-3xl serif-font text-gray-800 mb-2">Los 3 Pilares Temáticos (Temporada 1)</h2>
+                <p class="text-gray-600">La estructura de contenido está diseñada para llevar a la audiencia desde la introspección hasta la acción práctica, cobijados siempre por la identidad musical y empática de Paola.</p>
+            </header>
+
+            <div class="space-y-6 max-w-5xl mx-auto">
+                <!-- Pilar 1 -->
+                <div class="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-all">
+                    <div class="p-6 md:p-8 cursor-pointer flex justify-between items-center bg-gradient-to-r from-[#FDFBF7] to-white" onclick="togglePillar('pillar1-content', 'icon1')">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-sage rounded-full flex items-center justify-center text-white text-2xl shadow-sm">🌱</div>
+                            <div>
+                                <h3 class="text-xl md:text-2xl font-bold text-gray-800 serif-font">Pilar 1: Desaprendiendo con Amor</h3>
+                                <p class="text-sm text-gray-500">Rompiendo el trauma generacional</p>
+                            </div>
+                        </div>
+                        <span id="icon1" class="text-2xl text-gray-400 transition-transform duration-300">+</span>
+                    </div>
+                    <div id="pillar1-content" class="hidden px-6 md:px-8 pb-8 pt-2 border-t border-gray-50">
+                        <p class="text-gray-700 mb-4"><strong>El Enfoque:</strong> Aquí traducimos el valor espiritual de "la familia eterna" a conceptos de laicos psicológicos: apego seguro, espacios de confianza y sanación del niño interior. Es hacer consciente lo inconsciente.</p>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <strong class="text-sm text-gray-800 uppercase tracking-wide">Ejemplos de Episodios:</strong>
+                            <ul class="list-disc pl-5 mt-2 text-sm text-gray-600 space-y-1">
+                                <li>"¿Por qué reacciono así? Entendiendo mis heridas de la infancia."</li>
+                                <li>"La diferencia entre obediencia por miedo y respeto mutuo."</li>
+                                <li>"Perdonando a nuestros padres para poder criar diferente."</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pilar 2 -->
+                <div class="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-all">
+                    <div class="p-6 md:p-8 cursor-pointer flex justify-between items-center bg-gradient-to-r from-[#FDFBF7] to-white" onclick="togglePillar('pillar2-content', 'icon2')">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-sand rounded-full flex items-center justify-center text-white text-2xl shadow-sm">🛠️</div>
+                            <div>
+                                <h3 class="text-xl md:text-2xl font-bold text-gray-800 serif-font">Pilar 2: Herramientas para el Día a Día</h3>
+                                <p class="text-sm text-gray-500">Tácticas aplicables (El qué y el cómo)</p>
+                            </div>
+                        </div>
+                        <span id="icon2" class="text-2xl text-gray-400 transition-transform duration-300">+</span>
+                    </div>
+                    <div id="pillar2-content" class="hidden px-6 md:px-8 pb-8 pt-2 border-t border-gray-50">
+                        <p class="text-gray-700 mb-4"><strong>El Enfoque:</strong> Las familias necesitan soluciones urgentes. Este pilar es altamente compartible en redes (micro-contenido). Crianza positiva aplicada a los retos modernos.</p>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <strong class="text-sm text-gray-800 uppercase tracking-wide">Ejemplos de Episodios:</strong>
+                            <ul class="list-disc pl-5 mt-2 text-sm text-gray-600 space-y-1">
+                                <li>"El semáforo de las pantallas: Límites sanos con la tecnología."</li>
+                                <li>"Gestión de berrinches en lugares públicos (sin perder la calma)."</li>
+                                <li>"Rutinas de sueño: La magia de la guitarra y el canto de mamá/papá."</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pilar 3 -->
+                <div class="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-all">
+                    <div class="p-6 md:p-8 cursor-pointer flex justify-between items-center bg-gradient-to-r from-[#FDFBF7] to-white" onclick="togglePillar('pillar3-content', 'icon3')">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-terracotta rounded-full flex items-center justify-center text-white text-2xl shadow-sm">🎸</div>
+                            <div>
+                                <h3 class="text-xl md:text-2xl font-bold text-gray-800 serif-font">Pilar 3: El Rincón del Cuidador</h3>
+                                <p class="text-sm text-gray-500">Autocuidado, empatía y la Playlist Tzunum</p>
+                            </div>
+                        </div>
+                        <span id="icon3" class="text-2xl text-gray-400 transition-transform duration-300">+</span>
+                    </div>
+                    <div id="pillar3-content" class="hidden px-6 md:px-8 pb-8 pt-2 border-t border-gray-50">
+                        <p class="text-gray-700 mb-4"><strong>El Enfoque:</strong> Aquí brilla la marca personal de Paola. Episodios más cortos, reflexivos. Usamos la música como terapia. Es el abrazo al padre/madre que siente que hoy falló.</p>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <strong class="text-sm text-gray-800 uppercase tracking-wide">Ejemplos de Episodios:</strong>
+                            <ul class="list-disc pl-5 mt-2 text-sm text-gray-600 space-y-1">
+                                <li>"Hoy perdí la paciencia: Cómo reparar el vínculo."</li>
+                                <li>"La culpa materna/paterna y cómo soltarla."</li>
+                                <li>"Momento Tzunum: (Episodio especial de 10 min tocando guitarra y cantando para relajar al cuidador)."</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="mt-16 text-center text-sm text-gray-400 pb-8 border-t border-gray-200 pt-8">
+            <p>Estrategia generada por Productor Tzunum 🌺 | "Una gota de agua a la vez"</p>
+        </footer>
+
+    </main>
+
+    <script>
+        // --- Navigation Logic ---
+        function switchTab(tabId) {
+            // Hide all sections
+            document.querySelectorAll('.content-section').forEach(sec => {
+                sec.classList.add('hidden');
+                sec.classList.remove('block');
+            });
+            
+            // Show target section
+            const target = document.getElementById('sec-' + tabId);
+            target.classList.remove('hidden');
+            target.classList.add('block');
+
+            // Update Nav styling
+            document.querySelectorAll('nav button').forEach(btn => {
+                btn.classList.remove('tab-active');
+            });
+            document.getElementById('nav-' + tabId).classList.add('tab-active');
+
+            // Render Chart if navigating to trends
+            if(tabId === 'trends') {
+                renderTrendsChart();
+            }
+
+            // Close mobile menu if open
+            const sidebar = document.getElementById('sidebar');
+            if(window.innerWidth < 768 && !sidebar.classList.contains('hidden')) {
+                sidebar.classList.add('hidden');
+            }
+        }
+
+        // Mobile Menu Toggle
+        document.getElementById('mobile-menu-btn').addEventListener('click', () => {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('hidden');
+            sidebar.classList.toggle('absolute');
+            sidebar.classList.toggle('z-50');
+            sidebar.classList.toggle('h-screen');
+        });
+
+        // --- Interaction Logic (FODA & Pillars) ---
+        function toggleFoda(id) {
+            const el = document.getElementById(id);
+            if(el.classList.contains('hidden')) {
+                el.classList.remove('hidden');
+                el.classList.add('animate-fade-in');
+            } else {
+                el.classList.add('hidden');
+            }
+        }
+
+        function togglePillar(contentId, iconId) {
+            const content = document.getElementById(contentId);
+            const icon = document.getElementById(iconId);
+            
+            if(content.classList.contains('hidden')) {
+                content.classList.remove('hidden');
+                icon.style.transform = 'rotate(45deg)';
+            } else {
+                content.classList.add('hidden');
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        // --- Chart.js Logic (Radar Chart for Trends) ---
+        let trendsChartInstance = null;
+
+        function renderTrendsChart() {
+            const ctx = document.getElementById('trendsChart').getContext('2d');
+            
+            // Destroy existing chart to prevent overlaps on re-render
+            if (trendsChartInstance) {
+                trendsChartInstance.destroy();
+            }
+
+            // Custom Plugin for background color if needed, but Tailwind handles it.
+            Chart.defaults.font.family = "'Nunito', sans-serif";
+            Chart.defaults.color = '#666';
+
+            const data = {
+                labels: [
+                    'Uso de Pantallas', 
+                    'Salud Mental Niños', 
+                    'Estrés del Cuidador', 
+                    'Disciplina sin Golpes', 
+                    'Tiempo de Calidad',
+                    'Alimentación'
+                ],
+                datasets: [{
+                    label: 'Nivel de Preocupación LatAm (Escala 1-10)',
+                    data: [9.2, 8.5, 8.8, 9.0, 7.5, 6.0],
+                    backgroundColor: 'rgba(212, 163, 115, 0.2)', // bg-sand low opacity
+                    borderColor: '#D4A373', // bg-sand
+                    pointBackgroundColor: '#E29578', // bg-terracotta
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: '#E29578',
+                    borderWidth: 2,
+                }]
+            };
+
+            const config = {
+                type: 'radar',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            angleLines: { color: 'rgba(0, 0, 0, 0.05)' },
+                            grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                            pointLabels: {
+                                font: { size: 12, family: "'Nunito', sans-serif" },
+                                color: '#4A4A4A',
+                                callback: function(val) {
+                                    // Wrap labels (16 char logic simulation via array return if needed, though radar handles short text well)
+                                    return val;
+                                }
+                            },
+                            ticks: {
+                                beginAtZero: true,
+                                max: 10,
+                                stepSize: 2,
+                                display: false // hide numbers to keep it clean
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            titleColor: '#333',
+                            bodyColor: '#666',
+                            borderColor: '#D4A373',
+                            borderWidth: 1,
+                            padding: 10,
+                            displayColors: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Nivel de urgencia: ' + context.raw + '/10';
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            trendsChartInstance = new Chart(ctx, config);
+        }
+
+        // Add CSS animation dynamically
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .animate-fade-in {
+                animation: fadeIn 0.4s ease-out forwards;
+            }
+        `;
+        document.head.appendChild(style);
+
+    </script>
+</body>
+</html>

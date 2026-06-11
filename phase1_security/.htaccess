@@ -1,0 +1,84 @@
+# =============================================================================
+# AXON_DCD — Blindaje Perimetral Apache — Nivel Militar
+# Proyecto  : AXON_DCD v1.0.0
+# Generado  : 2026-06-11 07:51:27 — FoundationExecutor v1.0 — AXON_GENESIS
+# Capas     : 7 (Índices · Firma · Archivos · Rutas · Cabeceras · Caché · Compresión)
+# =============================================================================
+
+# ── Capa 1: Desactivar listado de directorios ──────────────────────────────────
+Options -Indexes -FollowSymLinks -MultiViews
+ServerSignature Off
+
+# ── Capa 2: Bloquear archivos sensibles por extensión ──────────────────────────
+<FilesMatch "\.(env|log|sql|json|md|lock|ini|bak|sh|key|pem|cert|crt|p12|pfx|pub|passwd|htpasswd)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# ── Capa 3: Bloquear rutas sensibles vía mod_rewrite ──────────────────────────
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    RewriteRule ^\.git(/|$)          - [F,L,NC]
+    RewriteRule ^\.svn(/|$)          - [F,L,NC]
+    RewriteRule ^\.claude(/|$)       - [F,L,NC]
+    RewriteRule ^\.github(/|$)       - [F,L,NC]
+    RewriteRule ^vendor(/|$)         - [F,L,NC]
+    RewriteRule ^knowledge(/|$)      - [F,L,NC]
+    RewriteRule ^logs(/|$)           - [F,L,NC]
+    RewriteRule ^backups(/|$)        - [F,L,NC]
+    RewriteRule ^CORE(/|$)           - [F,L,NC]
+    RewriteRule ^node_modules(/|$)   - [F,L,NC]
+    RewriteRule ^AXON_WORKSPACE(/|$) - [F,L,NC]
+</IfModule>
+
+# ── Capa 4: Cabeceras de seguridad HTTP (OWASP Top 10) ────────────────────────
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options    "nosniff"
+    Header always set X-Frame-Options           "SAMEORIGIN"
+    Header always set X-XSS-Protection          "1; mode=block"
+    Header always set Referrer-Policy           "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy        "camera=(), microphone=(), geolocation=()"
+    Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+    Header always unset X-Powered-By
+    Header always unset Server
+</IfModule>
+
+# ── Capa 5: Límites PHP y configuración de errores ────────────────────────────
+<IfModule mod_php.c>
+    php_value  post_max_size        10M
+    php_value  upload_max_filesize  10M
+    php_value  max_execution_time   60
+    php_value  memory_limit         256M
+    php_flag   display_errors       Off
+    php_flag   log_errors           On
+</IfModule>
+
+# ── Capa 6: Cache de assets estáticos ─────────────────────────────────────────
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpeg             "access plus 1 year"
+    ExpiresByType image/png              "access plus 1 year"
+    ExpiresByType image/webp             "access plus 1 year"
+    ExpiresByType image/svg+xml          "access plus 1 year"
+    ExpiresByType image/gif              "access plus 6 months"
+    ExpiresByType text/css               "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType application/json       "access plus 0 seconds"
+</IfModule>
+
+# ── Capa 7: Compresión Gzip ───────────────────────────────────────────────────
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml
+    AddOutputFilterByType DEFLATE text/css application/javascript application/json
+</IfModule>
+
+# =============================================================================
+# FIN — AXON_DCD Perimeter Shield v1.0
+# =============================================================================

@@ -1,0 +1,129 @@
+{
+    "reconocimiento_ok": true,
+    "adn_disponible": false,
+    "adn_campos": [],
+    "entorno_detectado": "desconocido",
+    "stack_backend": null,
+    "stack_frontend": null,
+    "credenciales_vault": [
+        {
+            "id": 2,
+            "tipo": "FTP",
+            "nombre": "FTP_Principal"
+        },
+        {
+            "id": 5,
+            "tipo": "FTP",
+            "nombre": "FTP_Principal"
+        },
+        {
+            "id": 9,
+            "tipo": "FTP",
+            "nombre": "FTP_Principal"
+        },
+        {
+            "id": 10,
+            "tipo": "FTP",
+            "nombre": "FTP_Principal"
+        },
+        {
+            "id": 3,
+            "tipo": "SMTP",
+            "nombre": "SMTP_Transaccional"
+        },
+        {
+            "id": 4,
+            "tipo": "SMTP",
+            "nombre": "SMTP_Transaccional"
+        },
+        {
+            "id": 7,
+            "tipo": "SMTP",
+            "nombre": "SMTP_Transaccional"
+        },
+        {
+            "id": 12,
+            "tipo": "SMTP",
+            "nombre": "SMTP_Transaccional"
+        },
+        {
+            "id": 1,
+            "tipo": "DB",
+            "nombre": "DB_Remota"
+        },
+        {
+            "id": 6,
+            "tipo": "DB",
+            "nombre": "DB_Remota"
+        },
+        {
+            "id": 8,
+            "tipo": "DB",
+            "nombre": "DB_Remota"
+        },
+        {
+            "id": 11,
+            "tipo": "DB",
+            "nombre": "DB_Remota"
+        }
+    ],
+    "workspace_dirs_ok": true,
+    "contexto_proyecto": {
+        "tipo_proyecto": "crear_desde_cero",
+        "vector_key": "axon_genesis_vector_cero",
+        "origen": "fundacion",
+        "id_partner": 8,
+        "creado_via": "ProyectoSelector",
+        "timestamp": "2026-06-10T22:33:13+02:00",
+        "brief": {
+            "nombre_organizacion": "El Efecto Ajedrez: Mentores al Revés",
+            "giro_industria": "Educación",
+            "descripcion_breve": "Medios de Comunicación \/ Marca Personal \/ VideoPodcast \/ Streaming \/ PODCAST",
+            "publico_objetivo": "Público Objetivo Perfil Demográfico: Padres, madres y cuidadores de familia en México y Latinoamérica (especialmente generaciones Millennial y Gen Z) con hijos en primera infancia y adolescencia temprana. Incluye un enfoque empático hacia padres\/madres que crían solos (familias monoparentales).  Perfil Psicográfico: Adultos que rechazan activamente el autoritarismo tradicional (golpes, insultos, imposición) pero que sufren de burnout parental o fatiga de decisión. Buscan herramientas de crianza respetuosa prácticas y aplicables. Valoran los espacios de vulnerabilidad y honestidad (\"compañeros de trinchera\") y huyen de los discursos moralistas o los ambientes de chismes.",
+            "ubicacion_geografica": "Matamoros, Tamaulipas, Mexico",
+            "objetivo_principal": "Fortalecer Posicionamiento de Marca",
+            "estilo_visual": "Creativo y Audaz",
+            "paleta_preferida": "Vibrante",
+            "secciones_requeridas": [
+                "Inicio",
+                "Nosotros",
+                "Servicios \/ Catálogo",
+                "Contacto",
+                "Blog",
+                "Reservas \/ Citas"
+            ],
+            "telefono_contacto": "Paola Palomares",
+            "correo_contacto": "+52 (868) 372-0972",
+            "horario_atencion": "",
+            "dominio_propio": "No, lo necesitamos",
+            "logotipo_disponible": "Sí, ya contamos con esto",
+            "redes_sociales_activas": [
+                "Ninguna actualmente"
+            ],
+            "notas_adicionales": ""
+        },
+        "ruta_proyecto": "C:\\xampp\\htdocs\\El_Efecto_ajedrez_PODCAST",
+        "logo_url": "C:\\xampp\\htdocs\\El_Efecto_ajedrez_PODCAST\\assets\\img\\logo.png",
+        "github_url": "https:\/\/github.com\/dacadomx-collab\/efecto-ajedrez.git",
+        "soporte_asignado_id": 5,
+        "assigned_at": "2026-06-11T04:51:19Z"
+    },
+    "foundation": {
+        "total_artefactos": 6,
+        "artefactos": [
+            ".env",
+            ".env.example",
+            ".htaccess",
+            ".gitignore",
+            "OPERATING_SYSTEM.md",
+            "deploy.yml"
+        ],
+        "credenciales_ok": 3,
+        "tipos_cargados": [
+            "FTP",
+            "SMTP",
+            "DB"
+        ],
+        "phase_dir": "C:\\AXON_WORKSPACE\\ws_5fe86a02-fe92-461a-b4a7-3838d0241225\\phase1_security\\"
+    }
+}
