@@ -422,6 +422,75 @@ a {
     margin-bottom: 0.5rem;
 }
 
+/* ── LABORATORIO DE LOGOS (api/logo_test.php — auditoría de marca) ───────── */
+
+.logo-lab-body {
+    margin: 0;
+}
+
+.logo-lab__bg {
+    min-height: 100vh;
+    padding: 3rem 0;
+}
+
+.logo-lab__bg--grafito {
+    background-color: var(--ajedrez-bg);
+}
+
+.logo-lab__bg--obsidiana {
+    background-color: var(--ajedrez-bg-obsidiana);
+}
+
+.logo-lab__bg--carbono {
+    background-color: var(--ajedrez-bg-carbono);
+}
+
+.logo-lab__heading {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.logo-lab__title {
+    font-family: var(--font-heading);
+    color: var(--ajedrez-text);
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    margin: 0 0 0.3rem;
+}
+
+.logo-lab__hex {
+    color: var(--ajedrez-text-muted);
+    font-family: monospace;
+    margin: 0;
+}
+
+.logo-lab__card-image-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    min-height: 160px;
+}
+
+.logo-lab__card-image-wrap img {
+    max-width: 100%;
+    max-height: 200px;
+    width: auto;
+    object-fit: contain;
+}
+
+.logo-lab__filename {
+    word-break: break-all;
+}
+
+.logo-lab__alpha {
+    color: var(--ajedrez-accent);
+}
+
+.logo-lab__empty {
+    color: var(--ajedrez-text-muted);
+    text-align: center;
+}
+
 /* ── RESPONSIVE — MOBILE FIRST ────────────────────────────────────────────── */
 
 @media (max-width: 720px) {

@@ -28,37 +28,35 @@
 
 ```
 El_Efecto_ajedrez_PODCAST/
-├── index.html / index.php           ← Punto de entrada principal
-├── .htaccess                        ← Blindaje Apache Nivel Militar (bloquea knowledge/, database/, artifacts/, logs/)
-├── .env                              ← Credenciales REALES (NUNCA en Git)
-├── .env.example                      ← Plantilla pública (sí en Git)
-├── .gitignore                        ← Protección del repositorio
-├── CLAUDE.md                         ← Este archivo — manual del agente
-├── FUENTEDEVERDAD_CONSOLIDADA.md      ← Índice maestro de gobernanza del andamiaje
+├── index.php                         ← Punto de entrada principal — Home SEO/SEO-IA
+├── favicon.ico
+├── .htaccess                         ← Blindaje Apache Nivel Militar (bloquea knowledge/, database/, logs/, .github/)
+├── .env                               ← Credenciales REALES (NUNCA en Git)
+├── .env.example                       ← Plantilla pública (sí en Git)
+├── .gitignore                         ← Protección del repositorio
+├── CLAUDE.md                          ← Este archivo — manual del agente
+├── FUENTEDEVERDAD_CONSOLIDADA.md       ← Índice maestro de gobernanza del andamiaje
 │
-├── api/                              ← Endpoints PHP (todos blindados) — vacío, pendiente de primer endpoint
-│   ├── conexion.php                  ← Conexión PDO centralizada (leer desde .env) — pendiente
-│   ├── cors.php                      ← Gestor CORS centralizado — pendiente
-│   ├── jwt.php                       ← Utilidad JWT HS256 — pendiente (solo si se requiere auth)
-│   ├── auth_middleware.php           ← Validación Bearer JWT + RBAC — pendiente
-│   └── [endpoint].php                ← Endpoints de negocio
+├── api/                               ← Endpoints PHP públicos (todos blindados)
+│   ├── conexion.php                   ← Clase `Database` — PDO centralizado, ATTR_EMULATE_PREPARES=false
+│   ├── cors.php                       ← Gestor CORS — lee ALLOWED_ORIGINS desde .env
+│   ├── captura_lead.php               ← Endpoint de captación de leads (patrón 6 capas)
+│   ├── status_check.php               ← Triple Handshake — diagnóstico FS/DB/SMTP
+│   └── logo_test.php                  ← Laboratorio de auditoría de marca (noindex, solo interno)
 │
-├── app/                              ← Vistas / lógica de frontend adicional
-├── database/                         ← Scripts SQL `.sql` (bloqueada en .htaccess)
+├── app/                               ← Vistas / lógica de frontend adicional
+├── database/                          ← Scripts SQL `.sql` + runner (bloqueada en .htaccess, excepción de Git para *.sql)
+│   ├── create_table_leads_captura.sql ← Ejecutado en producción 2026-06-29
+│   └── run_migration.php              ← Runner CLI-only de migraciones
 ├── assets/
-│   ├── css/
-│   ├── js/
-│   └── img/                          ← `logo.png` y `favicon.ico` ya disponibles
+│   ├── css/main.css                   ← Única hoja de estilos — paleta `--ajedrez-*`, ARF-Grid, lead-form, logo-lab
+│   ├── js/main.js                     ← Controlador del formulario de captación (fetch + estados UI)
+│   └── img/                           ← `logo.png` + variantes en evaluación, `favicon.ico`
 │
-├── artifacts/                        ← Plantillas de andamiaje (bloqueada en .htaccess, no se despliega)
-│   ├── .github/workflows/deploy.yml  ← Pipeline CI/CD de referencia
-│   ├── api/
-│   ├── CORE/
-│   └── public/
+├── .github/workflows/deploy.yml       ← Pipeline CI/CD real — FTP a /public_html/ajedrez/ en push a main
+├── logs/                              ← Logs del sistema (bloqueados en .htaccess)
 │
-├── logs/                             ← Logs del sistema (bloqueados en .htaccess)
-│
-└── knowledge/                        ← Memoria del sistema (bloqueada en .htaccess, NUNCA en Git)
+└── knowledge/                         ← Memoria del sistema (bloqueada en .htaccess, NUNCA en Git)
     ├── 00_ADN_Y_FILOSOFIA.md
     ├── 01_LEY_Y_PROTOCOLOS_DE_VUELO.md
     ├── 02_CODEX_Y_SCHEMA_MAESTRO.md
@@ -67,9 +65,11 @@ El_Efecto_ajedrez_PODCAST/
     ├── 05_MATRIZ_FINANCIERA_Y_VENTAS.md
     ├── 06_NUCLEO_COGNITIVO_Y_PROMPTS.md
     ├── 07_UI_MODULOS_Y_PANTALLAS.md
-    ├── Presentacion.html              ← Estrategia de mercado del podcast (FODA, tendencias, monetización)
-    └── info.txt                       ← CONFIDENCIAL. PROHIBIDO leer, parsear o subir a Git.
+    ├── Presentacion.html               ← Estrategia de mercado del podcast (FODA, tendencias, monetización)
+    └── info.txt                        ← CONFIDENCIAL. PROHIBIDO leer, parsear o subir a Git.
 ```
+
+> La carpeta `artifacts/` (plantilla de andamiaje AXON_GENESIS heredada, con un `deploy.yml` de referencia para un stack Next.js que no aplica a este proyecto) fue eliminada del filesystem local — nunca estuvo versionada en Git. El pipeline real y activo vive en `.github/workflows/deploy.yml`.
 
 > Los pilares `00`–`07` siguen en estado de plantilla genérica (placeholders `{{PROJECT_NAME}}`) heredados del andamiaje AXON_GENESIS. Se personalizan progresivamente a medida que se definen módulos, schema y contratos reales de este proyecto — nunca se copian contenidos de otro proyecto del holding.
 
@@ -164,8 +164,10 @@ Toda traducción nueva se registra de inmediato en `knowledge/02_CODEX_Y_SCHEMA_
 
 ## 7. PIPELINE CI/CD (GitHub Actions → FTP)
 
-**Archivo de referencia:** `artifacts/.github/workflows/deploy.yml` (plantilla — activar en `.github/workflows/` real al confirmar hosting)
+**Archivo activo:** `.github/workflows/deploy.yml`
+**Repositorio:** `https://github.com/dacadomx-collab/efecto-ajedrez.git`
 **Trigger:** Push a rama `main`
+**Destino:** `/public_html/ajedrez/` (Absolute Remote Dir: `/home/tourfindycom/public_html/ajedrez`)
 
 **GitHub Secrets requeridos** (Settings → Secrets → Actions):
 | Secret | Contenido |
@@ -173,13 +175,13 @@ Toda traducción nueva se registra de inmediato en `knowledge/02_CODEX_Y_SCHEMA_
 | `FTP_SERVER` | Servidor FTP del hosting |
 | `FTP_USERNAME` | Usuario FTP |
 | `FTP_PASSWORD` | Contraseña FTP (NUNCA en código) |
-| `FTP_REMOTE_DIR` | Ruta remota (ej. `/public_html/`) |
 
 **Excluido del deploy:**
-- Credenciales: `.env`
+- Credenciales: `.env`, `.env.*`
 - Documentación interna: `knowledge/`
-- Andamiaje de plantilla: `artifacts/`
+- Scripts SQL: `database/`
 - Logs: `logs/`
+- Git/CI: `.git*`, `.github/**`
 
 ---
 
@@ -248,3 +250,4 @@ Toda cuadrícula de tarjetas, módulos o galerías del frontend usa el patrón *
 | :--- | :--- | :--- |
 | v1.0 | 2026-06-09 | Creación inicial del manual operativo (plantilla AXON_GENESIS) |
 | v1.1 | 2026-06-29 | Génesis Élite v3 — Personalización para El Efecto Ajedrez: Mentores al Revés. Bóveda de secretos, blindaje `.htaccess` (+`artifacts/`), reglas ARF-Grid y ORO documentadas. |
+| v1.2 | 2026-06-29 | Capa transaccional activada (`api/conexion.php`, `cors.php`, `captura_lead.php`, `status_check.php`), migración `leads_captura` ejecutada en producción, pipeline real en `.github/workflows/deploy.yml`. Bug de rutas absolutas corregido (rutas relativas al documento). Paleta renombrada de "ALISER" a `--ajedrez-*` (propia del proyecto). `artifacts/` (plantilla heredada, nunca versionada) eliminada del filesystem local. `api/logo_test.php` añadido como laboratorio de auditoría de marca. |
