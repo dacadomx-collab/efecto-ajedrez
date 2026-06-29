@@ -1,0 +1,53 @@
+# =============================================================================
+# Deploy CI/CD — El Efecto Ajedrez: Mentores al Revés
+# Repositorio : https://github.com/dacadomx-collab/efecto-ajedrez.git
+# Destino     : /home/tourfindycom/public_html/ajedrez (Document Root: /public_html/ajedrez)
+# Pipeline    : checkout → FTP deploy (sitio estático PHP, sin build step)
+# FTP Action  : SamKirkland/FTP-Deploy-Action@v4.3.5
+# =============================================================================
+
+name: "Deploy El Efecto Ajedrez"
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: "deploy-efecto-ajedrez"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: "Deploy FTP a producción"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: "Checkout código fuente"
+        uses: actions/checkout@v4
+
+      - name: "Deploy via FTP"
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: /public_html/ajedrez/
+          local-dir: ./
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/knowledge/**
+            **/database/**
+            **/artifacts/**
+            **/logs/**
+            **/backups/**
+            **/.env
+            **/.env.*
+            **/*.sql
+            **/*.log
+            **/*.md
+            **/node_modules/**
+            **/.claude/**

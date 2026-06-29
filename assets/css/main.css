@@ -1,0 +1,435 @@
+/* =============================================================================
+   PROYECTO  : El Efecto Ajedrez — Mentores al Revés
+   ARCHIVO   : assets/css/main.css
+   REGLA ORO : Única hoja de estilos del frontend. Cero estilos inline.
+               Cero !important. Paleta El Efecto Ajedrez vía variables CSS en :root.
+   ============================================================================= */
+
+:root {
+    /* Paleta El Efecto Ajedrez — Trinchera Nocturna */
+    --ajedrez-bg: #10141E;
+    --ajedrez-bg-obsidiana: #0A0C14;
+    --ajedrez-bg-elevated: #181d2b;
+    --ajedrez-bg-carbono: #1E2230;
+    --ajedrez-accent: #E91E63;
+    --ajedrez-accent-soft: rgba(233, 30, 99, 0.18);
+    --ajedrez-text: #FFFFFF;
+    --ajedrez-text-muted: #B8C0CC;
+
+    --container-max: 1180px;
+    --radius-base: 14px;
+    --font-heading: "Bebas Neue", "Montserrat", system-ui, -apple-system, sans-serif;
+    --font-base: "Inter", "Open Sans", system-ui, -apple-system, sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    margin: 0;
+    font-family: var(--font-base);
+    background-color: var(--ajedrez-bg);
+    color: var(--ajedrez-text);
+    line-height: 1.6;
+}
+
+img {
+    max-width: 100%;
+    display: block;
+}
+
+a {
+    color: var(--ajedrez-accent);
+}
+
+.container {
+    width: 100%;
+    max-width: var(--container-max);
+    margin: 0 auto;
+    padding: 0 1.25rem;
+}
+
+/* ── HEADER / NAV ─────────────────────────────────────────────────────────── */
+
+.site-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background-color: rgba(16, 20, 30, 0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.site-header__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.85rem 0;
+}
+
+.site-header__brand {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    text-decoration: none;
+    color: var(--ajedrez-text);
+}
+
+.site-header__logo {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.site-header__brand-name {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: 0.02em;
+}
+
+.site-nav {
+    display: flex;
+    gap: 1.25rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.site-nav a {
+    color: var(--ajedrez-text-muted);
+    text-decoration: none;
+    font-size: 0.95rem;
+}
+
+.site-nav a:hover {
+    color: var(--ajedrez-accent);
+}
+
+/* ── HERO ─────────────────────────────────────────────────────────────────── */
+
+.hero {
+    position: relative;
+    padding: 4.5rem 0 4rem;
+    background:
+        radial-gradient(circle at 20% 20%, var(--ajedrez-accent-soft), transparent 55%),
+        radial-gradient(circle at 80% 0%, rgba(233, 30, 99, 0.10), transparent 50%),
+        var(--ajedrez-bg);
+    text-align: center;
+    overflow: hidden;
+}
+
+.hero__eyebrow {
+    display: inline-block;
+    color: var(--ajedrez-accent);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    margin-bottom: 1rem;
+}
+
+.hero__title {
+    font-family: var(--font-heading);
+    font-size: clamp(1.9rem, 5vw, 3.2rem);
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    margin: 0 0 1.1rem;
+    max-width: 820px;
+    margin-inline: auto;
+}
+
+.hero__subtitle {
+    color: var(--ajedrez-text-muted);
+    font-size: clamp(1rem, 2vw, 1.2rem);
+    max-width: 620px;
+    margin: 0 auto 2rem;
+}
+
+.btn {
+    display: inline-block;
+    padding: 0.9rem 1.8rem;
+    border-radius: 999px;
+    font-weight: 700;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.btn--primary {
+    background-color: var(--ajedrez-accent);
+    color: var(--ajedrez-text);
+    box-shadow: 0 0 0 0 rgba(233, 30, 99, 0.6);
+}
+
+.btn--primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(233, 30, 99, 0.35);
+}
+
+/* ── SECCIONES GENERALES ──────────────────────────────────────────────────── */
+
+.section {
+    padding: 3.5rem 0;
+}
+
+.section__heading {
+    text-align: center;
+    margin-bottom: 2.25rem;
+}
+
+.section__title {
+    font-family: var(--font-heading);
+    font-size: clamp(1.5rem, 3vw, 2.1rem);
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    margin: 0 0 0.5rem;
+}
+
+.section__lead {
+    color: var(--ajedrez-text-muted);
+    max-width: 640px;
+    margin: 0 auto;
+}
+
+.section--alt {
+    background-color: var(--ajedrez-bg-elevated);
+}
+
+/* ── BLOQUE EN VIVO "ENTRE CUATES" ────────────────────────────────────────── */
+
+.live-block {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2rem;
+    align-items: center;
+}
+
+.live-block__player {
+    flex: 1 1 560px;
+    max-width: 720px;
+}
+
+.live-block__frame-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--radius-base);
+    overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.live-block__frame-wrap iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+.live-block__info {
+    flex: 1 1 320px;
+    max-width: 420px;
+}
+
+.live-block__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--ajedrez-accent);
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+}
+
+.live-block__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--ajedrez-accent);
+}
+
+/* ── ARF-GRID — Grid responsivo de módulos repetitivos ───────────────────── */
+
+.arf-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1.5rem;
+}
+
+.arf-grid__item {
+    flex: 1 1 280px;
+    max-width: 340px;
+    background-color: var(--ajedrez-bg-elevated);
+    border-radius: var(--radius-base);
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.arf-grid__item:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+.arf-grid__thumb-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+}
+
+.arf-grid__thumb-wrap img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.25s ease;
+}
+
+.arf-grid__item:hover .arf-grid__thumb-wrap img {
+    transform: scale(1.06);
+}
+
+.arf-grid__overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 40%, rgba(16, 20, 30, 0.85));
+    z-index: 1;
+}
+
+.arf-grid__body {
+    padding: 1rem 1.1rem 1.3rem;
+}
+
+.arf-grid__title {
+    font-family: var(--font-heading);
+    font-size: 1.02rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    margin: 0 0 0.4rem;
+}
+
+.arf-grid__meta {
+    color: var(--ajedrez-text-muted);
+    font-size: 0.85rem;
+    margin: 0;
+}
+
+/* ── FORMULARIO DE CAPTACIÓN ──────────────────────────────────────────────── */
+
+.lead-form {
+    max-width: 480px;
+    margin: 0 auto;
+    background-color: var(--ajedrez-bg-elevated);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius-base);
+    padding: 2rem;
+}
+
+.lead-form__field {
+    margin-bottom: 1.1rem;
+    text-align: left;
+}
+
+.lead-form__label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--ajedrez-text-muted);
+    margin-bottom: 0.4rem;
+}
+
+.lead-form__input {
+    width: 100%;
+    padding: 0.75rem 0.9rem;
+    background-color: var(--ajedrez-bg);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    color: var(--ajedrez-text);
+    font-size: 0.95rem;
+}
+
+.lead-form__input:focus {
+    outline: none;
+    border-color: var(--ajedrez-accent);
+}
+
+.lead-form__submit {
+    width: 100%;
+}
+
+.lead-form__status {
+    margin-top: 0.85rem;
+    font-size: 0.85rem;
+    min-height: 1.2em;
+}
+
+.lead-form__status--success {
+    color: #4ADE80;
+}
+
+.lead-form__status--error {
+    color: var(--ajedrez-accent);
+}
+
+.lead-form__status--loading {
+    color: var(--ajedrez-text-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.lead-form__spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--ajedrez-accent-soft);
+    border-top-color: var(--ajedrez-accent);
+    border-radius: 50%;
+    display: inline-block;
+    animation: lead-form-spin 0.7s linear infinite;
+}
+
+@keyframes lead-form-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ── FOOTER ───────────────────────────────────────────────────────────────── */
+
+.site-footer {
+    padding: 2.5rem 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    text-align: center;
+    color: var(--ajedrez-text-muted);
+    font-size: 0.85rem;
+}
+
+.site-footer__philosophy {
+    color: var(--ajedrez-accent);
+    font-style: italic;
+    margin-bottom: 0.5rem;
+}
+
+/* ── RESPONSIVE — MOBILE FIRST ────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+    .site-nav {
+        display: none;
+    }
+
+    .live-block {
+        flex-direction: column;
+    }
+}
