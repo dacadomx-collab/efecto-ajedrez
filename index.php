@@ -57,19 +57,30 @@
                 <img src="assets/img/logo.png" alt="El Efecto Ajedrez: Mentores al Revés" class="site-header__logo">
                 <span class="site-header__brand-name">El Efecto Ajedrez</span>
             </a>
-            <nav aria-label="Navegación principal">
-                <ul class="site-nav">
-                    <li><a href="#en-vivo">En Vivo</a></li>
-                    <li><a href="#episodios">Episodios</a></li>
-                    <li><a href="#botiquin">Botiquín Musical</a></li>
+            <div class="site-header__nav-group">
+                <nav aria-label="Navegación principal">
+                    <ul class="site-nav">
+                        <li><a href="#en-vivo">En Vivo</a></li>
+                        <li><a href="#episodios">Episodios</a></li>
+                        <li><a href="#botiquin">Botiquín Musical</a></li>
+                    </ul>
+                </nav>
+                <ul class="social-links" aria-label="Redes sociales">
+                    <li><a href="https://www.youtube.com/@elefectoajedrez" target="_blank" rel="noopener" aria-label="YouTube">YouTube</a></li>
+                    <li><a href="https://open.spotify.com/show/elefectoajedrez" target="_blank" rel="noopener" aria-label="Spotify">Spotify</a></li>
+                    <li><a href="https://www.instagram.com/elefectoajedrez" target="_blank" rel="noopener" aria-label="Instagram">Instagram</a></li>
+                    <li><a href="https://www.tiktok.com/@elefectoajedrez" target="_blank" rel="noopener" aria-label="TikTok">TikTok</a></li>
+                    <li><a href="https://www.facebook.com/elefectoajedrez" target="_blank" rel="noopener" aria-label="Facebook">Facebook</a></li>
+                    <li><a href="https://www.twitch.tv/elefectoajedrez" target="_blank" rel="noopener" aria-label="Twitch">Twitch</a></li>
                 </ul>
-            </nav>
+            </div>
         </div>
     </header>
 
     <main>
         <section class="hero" aria-labelledby="hero-title">
             <div class="container">
+                <img src="assets/img/logo1.png" alt="El Efecto Ajedrez: Mentores al Revés" class="hero__wordmark">
                 <span class="hero__eyebrow">Crianza Positiva · Educación sin Violencia</span>
                 <h1 id="hero-title" class="hero__title">No tengo todas las respuestas, pero juntos encontramos el sentido.</h1>
                 <p class="hero__subtitle">Paola Palomares traduce el agotamiento parental y los berrinches en sesiones de trinchera con música, empatía y comunidad — bajo la filosofía "Colibrí siempre colibrí".</p>
@@ -167,6 +178,14 @@
 
     <footer class="site-footer">
         <div class="container">
+            <ul class="social-links social-links--footer" aria-label="Redes sociales">
+                <li><a href="https://www.youtube.com/@elefectoajedrez" target="_blank" rel="noopener" aria-label="YouTube">YouTube</a></li>
+                <li><a href="https://open.spotify.com/show/elefectoajedrez" target="_blank" rel="noopener" aria-label="Spotify">Spotify</a></li>
+                <li><a href="https://www.instagram.com/elefectoajedrez" target="_blank" rel="noopener" aria-label="Instagram">Instagram</a></li>
+                <li><a href="https://www.tiktok.com/@elefectoajedrez" target="_blank" rel="noopener" aria-label="TikTok">TikTok</a></li>
+                <li><a href="https://www.facebook.com/elefectoajedrez" target="_blank" rel="noopener" aria-label="Facebook">Facebook</a></li>
+                <li><a href="https://www.twitch.tv/elefectoajedrez" target="_blank" rel="noopener" aria-label="Twitch">Twitch</a></li>
+            </ul>
             <p class="site-footer__philosophy">"Colibrí siempre colibrí"</p>
             <p>&copy; 2026 El Efecto Ajedrez: Mentores al Revés — Paola Palomares.</p>
         </div>

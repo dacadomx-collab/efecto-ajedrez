@@ -127,3 +127,8 @@ composer.phar
 # de fábrica: knowledge/ nunca se versiona (memoria interna), igual que .env e
 # info.txt ya bloqueados arriba. Las instrucciones de IA permanecen 100% locales.
 /knowledge/
+
+# ── GALERÍA HISTÓRICA DE LOGOS (solo consulta local — Auditoría 2026-06-29) ──
+# Variantes descartadas de la auditoría de marca (api/logo_test.php). Nunca se
+# rastrea ni se despliega — el isotipo final vive en assets/img/logo*.png.
+/assets/img/historia/

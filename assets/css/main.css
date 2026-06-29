@@ -112,6 +112,38 @@ a {
     color: var(--ajedrez-accent);
 }
 
+.site-header__nav-group {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.social-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.social-links a {
+    color: var(--ajedrez-accent);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.social-links a:hover {
+    color: var(--ajedrez-text);
+}
+
+.social-links--footer {
+    margin-bottom: 1.5rem;
+}
+
 /* ── HERO ─────────────────────────────────────────────────────────────────── */
 
 .hero {
@@ -123,6 +155,12 @@ a {
         var(--ajedrez-bg);
     text-align: center;
     overflow: hidden;
+}
+
+.hero__wordmark {
+    max-width: 320px;
+    width: 60%;
+    margin: 0 auto 1.5rem;
 }
 
 .hero__eyebrow {
@@ -491,11 +529,49 @@ a {
     text-align: center;
 }
 
+/* ── REPORTE TPN (TPN/Precision_Diagnostica_TPN.html) ─────────────────────── */
+
+.tpn-card {
+    padding: 1.75rem;
+    text-align: left;
+}
+
+.tpn-card__title {
+    font-family: var(--font-heading);
+    color: var(--ajedrez-accent);
+    font-size: 1.15rem;
+    letter-spacing: 0.01em;
+    margin: 0 0 0.75rem;
+}
+
+.tpn-card__text {
+    color: var(--ajedrez-text);
+    font-size: 0.95rem;
+    line-height: 1.7;
+    margin: 0;
+}
+
+.tpn-back-link {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    color: var(--ajedrez-text-muted);
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.tpn-back-link:hover {
+    color: var(--ajedrez-accent);
+}
+
 /* ── RESPONSIVE — MOBILE FIRST ────────────────────────────────────────────── */
 
 @media (max-width: 720px) {
     .site-nav {
         display: none;
+    }
+
+    .hero__wordmark {
+        width: 75%;
     }
 
     .live-block {

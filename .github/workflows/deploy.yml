@@ -33,7 +33,12 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: /public_html/ajedrez/
+          # La cuenta FTP de cPanel ya está enjaulada en
+          # /home/tourfindycom/public_html/ajedrez (su propio "home"). Usar
+          # "/public_html/ajedrez/" aquí duplicaba la ruta en el servidor
+          # (/public_html/ajedrez/public_html/ajedrez/...). El root FTP YA es
+          # el Document Root — server-dir debe ser la raíz relativa "./".
+          server-dir: ./
           local-dir: ./
           exclude: |
             **/.git*
@@ -44,6 +49,7 @@ jobs:
             **/artifacts/**
             **/logs/**
             **/backups/**
+            **/assets/img/historia/**
             **/.env
             **/.env.*
             **/*.sql
