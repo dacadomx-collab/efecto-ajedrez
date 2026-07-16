@@ -938,6 +938,251 @@ a {
     flex-shrink: 0;
 }
 
+/* ── PÁGINAS DE AUTENTICACIÓN (login.php, setup-genesis.php, invitacion.php) ── */
+
+.auth-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    padding: 3rem 0;
+}
+
+.auth-page__wrap {
+    max-width: 480px;
+    margin: 0 auto;
+    width: 100%;
+    text-align: center;
+}
+
+.auth-page__brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    text-decoration: none;
+    color: var(--ajedrez-text);
+    font-family: var(--font-heading);
+    font-weight: 700;
+    margin-bottom: 1.75rem;
+}
+
+.auth-page__title {
+    font-family: var(--font-heading);
+    font-size: clamp(1.3rem, 3vw, 1.7rem);
+    margin: 0 0 0.75rem;
+}
+
+.auth-page__lead {
+    color: var(--ajedrez-text-muted);
+    margin: 0 0 1.25rem;
+}
+
+.auth-page__hint {
+    color: var(--ajedrez-text-muted);
+    font-size: 0.8rem;
+    margin: -0.5rem 0 1.1rem;
+    text-align: left;
+}
+
+.auth-error-container {
+    max-width: 480px;
+    margin: 1.25rem auto 0;
+    padding: 1.25rem 1.5rem;
+    background-color: var(--ajedrez-bg-elevated);
+    border: 1px solid var(--ajedrez-accent);
+    border-radius: var(--radius-base);
+    text-align: center;
+}
+
+.auth-error-container p {
+    color: var(--ajedrez-text);
+    margin: 0 0 1rem;
+}
+
+/* ── DASHBOARD UNIVERSAL — Shell Mobile-First (dashboard.php) ─────────────── */
+
+.dash-body {
+    margin: 0;
+    background-color: var(--ajedrez-bg);
+}
+
+.dash-shell {
+    min-height: 100vh;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.dash-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.85rem 1.25rem;
+    background-color: rgba(16, 20, 30, 0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.dash-topbar__burger {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.dash-topbar__burger-line {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background-color: var(--ajedrez-text);
+    border-radius: 2px;
+    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease;
+}
+
+.dash-shell--nav-open .dash-topbar__burger-line:nth-child(1) {
+    transform: translateY(7px) rotate(45deg);
+}
+
+.dash-shell--nav-open .dash-topbar__burger-line:nth-child(2) {
+    opacity: 0;
+}
+
+.dash-shell--nav-open .dash-topbar__burger-line:nth-child(3) {
+    transform: translateY(-7px) rotate(-45deg);
+}
+
+.dash-topbar__brand {
+    font-family: var(--font-heading);
+    color: var(--ajedrez-text);
+    text-decoration: none;
+    font-weight: 700;
+    flex: 1;
+}
+
+.dash-topbar__logout {
+    background: none;
+    border: 1px solid rgba(233, 30, 99, 0.4);
+    color: var(--ajedrez-text-muted);
+    border-radius: 999px;
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.18s ease, border-color 0.18s ease;
+}
+
+.dash-topbar__logout:hover {
+    color: var(--ajedrez-text);
+    border-color: var(--ajedrez-accent);
+}
+
+.dash-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 50;
+    width: min(280px, 80vw);
+    background-color: var(--ajedrez-bg-elevated);
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 5.5rem 1.5rem 1.5rem;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+}
+
+.dash-shell--nav-open .dash-nav {
+    transform: translateX(0);
+}
+
+.dash-nav__user {
+    color: var(--ajedrez-text-muted);
+    font-size: 0.85rem;
+    margin: 0 0 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.dash-nav__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.dash-nav__link {
+    display: block;
+    padding: 0.75rem 0.5rem;
+    color: var(--ajedrez-text);
+    text-decoration: none;
+    border-radius: 8px;
+    transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.dash-nav__link:hover {
+    background-color: var(--ajedrez-accent-soft);
+    color: var(--ajedrez-accent);
+}
+
+.dash-nav-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    background-color: rgba(10, 12, 20, 0.7);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.28s ease;
+}
+
+.dash-shell--nav-open .dash-nav-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.dash-content {
+    width: 100%;
+    max-width: 100%;
+    padding: 2rem 0 3rem;
+    overflow-x: hidden;
+}
+
+.dash-content__rol {
+    margin: 0 0 2rem;
+}
+
+.dash-panel {
+    margin-top: 1.5rem;
+}
+
+.dash-panel__title {
+    font-family: var(--font-heading);
+    font-size: 1.3rem;
+    margin: 0 0 1.25rem;
+}
+
+.dash-panel__grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1.5rem;
+}
+
+.dash-panel__grid .lead-form {
+    flex: 1 1 320px;
+    max-width: 400px;
+    margin: 0;
+}
+
 /* ── RESPONSIVE — MOBILE FIRST ────────────────────────────────────────────── */
 
 @media (max-width: 720px) {

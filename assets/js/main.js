@@ -3,6 +3,14 @@ document.addEventListener('DOMContentLoaded', function () {
     initClubLectura();
     initScrollTop();
     initClubHostPhoto();
+    initDashNav();
+    initAuthErrorRetry();
+    initSetupGenesisForm();
+    initLoginForm();
+    initInvitacionForm();
+    initUsuarioCrearForm();
+    initUsuarioInvitarForm();
+    initDashLogout();
 });
 
 function initLeadForm() {
@@ -212,5 +220,360 @@ function initClubHostPhoto() {
         if (event.key === 'Escape') {
             closeMagnify();
         }
+    });
+}
+
+/* ── DASHBOARD UNIVERSAL — Menú hamburguesa (dashboard.php) ───────────────── */
+
+function initDashNav() {
+    const shell = document.querySelector('[data-dash-shell]');
+    const burger = document.getElementById('dash-burger');
+    const nav = document.querySelector('[data-dash-nav]');
+    if (!shell || !burger || !nav) {
+        return;
+    }
+
+    function openNav() {
+        shell.classList.add('dash-shell--nav-open');
+        burger.setAttribute('aria-expanded', 'true');
+        nav.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeNav() {
+        shell.classList.remove('dash-shell--nav-open');
+        burger.setAttribute('aria-expanded', 'false');
+        nav.setAttribute('aria-hidden', 'true');
+    }
+
+    burger.addEventListener('click', function () {
+        shell.classList.contains('dash-shell--nav-open') ? closeNav() : openNav();
+    });
+
+    document.querySelectorAll('[data-dash-nav-close]').forEach(function (el) {
+        el.addEventListener('click', closeNav);
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            closeNav();
+        }
+    });
+}
+
+function initDashLogout() {
+    const btn = document.getElementById('dash-logout-btn');
+    if (!btn) {
+        return;
+    }
+
+    btn.addEventListener('click', function () {
+        btn.disabled = true;
+
+        fetch('api/logout.php', { method: 'POST', credentials: 'same-origin' })
+            .finally(function () {
+                window.location.href = 'login.php';
+            });
+    });
+}
+
+/* ── ESTADO IRREVERSIBLE ANTE FALLOS CRÍTICOS (login/setup/invitación) ────── */
+
+const authState = {
+    halted: false,
+};
+
+function haltAuthFlow(message) {
+    authState.halted = true;
+
+    const errorBox = document.getElementById('auth-error-container');
+    const errorMsg = document.getElementById('auth-error-message');
+    if (errorBox && errorMsg) {
+        errorMsg.textContent = message;
+        errorBox.hidden = false;
+    }
+
+    const retryBtn = document.getElementById('auth-retry-btn');
+    if (retryBtn) {
+        retryBtn.disabled = false;
+    }
+}
+
+function initAuthErrorRetry() {
+    const retryBtn = document.getElementById('auth-retry-btn');
+    if (!retryBtn) {
+        return;
+    }
+
+    retryBtn.addEventListener('click', function () {
+        window.location.reload();
+    });
+}
+
+/* ── LOOP DE PRIMER ARRANQUE — Configuración Génesis (setup-genesis.php) ──── */
+
+function initSetupGenesisForm() {
+    const form = document.getElementById('setup-genesis-form');
+    if (!form) {
+        return;
+    }
+
+    const statusEl = document.getElementById('setup-genesis-status');
+    const submitBtn = form.querySelector('.lead-form__submit');
+
+    form.addEventListener('submit', function (event) {
+        event.preventDefault();
+
+        if (authState.halted) {
+            return;
+        }
+
+        const nombre = form.elements.nombre.value.trim();
+        const email = form.elements.email.value.trim();
+        const password = form.elements.password.value;
+        const passwordConfirmacion = form.elements.password_confirmacion.value;
+
+        if (!nombre || !email || !password) {
+            setStatus(statusEl, 'Completa todos los campos.', 'error');
+            return;
+        }
+
+        submitBtn.disabled = true;
+        setStatus(statusEl, 'Creando cuenta raíz...', 'loading');
+
+        fetch('api/setup_genesis.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nombre: nombre, email: email, password: password, password_confirmacion: passwordConfirmacion })
+        })
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    return { ok: response.ok, data: data };
+                });
+            })
+            .then(function (result) {
+                if (result.ok && result.data.status === 'success') {
+                    setStatus(statusEl, result.data.message + ' Redirigiendo...', 'success');
+                    setTimeout(function () {
+                        window.location.href = 'login.php';
+                    }, 1500);
+                } else {
+                    setStatus(statusEl, result.data.message || 'No pudimos completar la inicialización.', 'error');
+                    submitBtn.disabled = false;
+                }
+            })
+            .catch(function () {
+                haltAuthFlow('No pudimos conectar con el servidor. Verifica tu conexión e intenta de nuevo.');
+            });
+    });
+}
+
+/* ── LOGIN (login.php) ─────────────────────────────────────────────────────── */
+
+function initLoginForm() {
+    const form = document.getElementById('login-form');
+    if (!form) {
+        return;
+    }
+
+    const statusEl = document.getElementById('login-status');
+    const submitBtn = form.querySelector('.lead-form__submit');
+
+    form.addEventListener('submit', function (event) {
+        event.preventDefault();
+
+        if (authState.halted) {
+            return;
+        }
+
+        const email = form.elements.email.value.trim();
+        const password = form.elements.password.value;
+
+        if (!email || !password) {
+            setStatus(statusEl, 'Completa correo y contraseña.', 'error');
+            return;
+        }
+
+        submitBtn.disabled = true;
+        setStatus(statusEl, 'Verificando...', 'loading');
+
+        fetch('api/login.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, password: password })
+        })
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    return { ok: response.ok, data: data };
+                });
+            })
+            .then(function (result) {
+                if (result.ok && result.data.status === 'success') {
+                    setStatus(statusEl, result.data.message, 'success');
+                    window.location.href = 'dashboard.php';
+                } else {
+                    setStatus(statusEl, result.data.message || 'Credenciales inválidas.', 'error');
+                    submitBtn.disabled = false;
+                }
+            })
+            .catch(function () {
+                haltAuthFlow('No pudimos conectar con el servidor. Verifica tu conexión e intenta de nuevo.');
+            });
+    });
+}
+
+/* ── INVITACIÓN — Aceptación (invitacion.php) ─────────────────────────────── */
+
+function initInvitacionForm() {
+    const form = document.getElementById('invitacion-form');
+    if (!form) {
+        return;
+    }
+
+    const statusEl = document.getElementById('invitacion-status');
+    const submitBtn = form.querySelector('.lead-form__submit');
+    const token = form.dataset.token;
+
+    form.addEventListener('submit', function (event) {
+        event.preventDefault();
+
+        if (authState.halted) {
+            return;
+        }
+
+        const password = form.elements.password.value;
+        const passwordConfirmacion = form.elements.password_confirmacion.value;
+
+        if (!password || password !== passwordConfirmacion) {
+            setStatus(statusEl, 'Las contraseñas no coinciden.', 'error');
+            return;
+        }
+
+        submitBtn.disabled = true;
+        setStatus(statusEl, 'Activando tu cuenta...', 'loading');
+
+        fetch('api/invitacion_confirmar.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: token, password: password, password_confirmacion: passwordConfirmacion })
+        })
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    return { ok: response.ok, data: data };
+                });
+            })
+            .then(function (result) {
+                if (result.ok && result.data.status === 'success') {
+                    setStatus(statusEl, result.data.message + ' Redirigiendo...', 'success');
+                    setTimeout(function () {
+                        window.location.href = 'login.php';
+                    }, 1500);
+                } else {
+                    setStatus(statusEl, result.data.message || 'No pudimos activar tu cuenta.', 'error');
+                    submitBtn.disabled = false;
+                }
+            })
+            .catch(function () {
+                haltAuthFlow('No pudimos conectar con el servidor. Verifica tu conexión e intenta de nuevo.');
+            });
+    });
+}
+
+/* ── DASHBOARD — Alta de usuarios (dashboard.php) ─────────────────────────── */
+
+function initUsuarioCrearForm() {
+    const form = document.getElementById('usuario-crear-form');
+    if (!form) {
+        return;
+    }
+
+    const statusEl = document.getElementById('usuario-crear-status');
+    const submitBtn = form.querySelector('.lead-form__submit');
+
+    form.addEventListener('submit', function (event) {
+        event.preventDefault();
+
+        const nombre = form.elements.nombre.value.trim();
+        const email = form.elements.email.value.trim();
+        const password = form.elements.password.value;
+
+        submitBtn.disabled = true;
+        setStatus(statusEl, 'Creando...', 'loading');
+
+        fetch('api/usuarios_crear.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nombre: nombre, email: email, password: password })
+        })
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    return { ok: response.ok, data: data };
+                });
+            })
+            .then(function (result) {
+                if (result.ok && result.data.status === 'success') {
+                    setStatus(statusEl, result.data.message, 'success');
+                    form.reset();
+                } else {
+                    setStatus(statusEl, result.data.message || 'No pudimos crear el usuario.', 'error');
+                }
+            })
+            .catch(function () {
+                setStatus(statusEl, 'Error de conexión. Intenta de nuevo.', 'error');
+            })
+            .finally(function () {
+                submitBtn.disabled = false;
+            });
+    });
+}
+
+function initUsuarioInvitarForm() {
+    const form = document.getElementById('usuario-invitar-form');
+    if (!form) {
+        return;
+    }
+
+    const statusEl = document.getElementById('usuario-invitar-status');
+    const submitBtn = form.querySelector('.lead-form__submit');
+
+    form.addEventListener('submit', function (event) {
+        event.preventDefault();
+
+        const nombre = form.elements.nombre.value.trim();
+        const email = form.elements.email.value.trim();
+
+        submitBtn.disabled = true;
+        setStatus(statusEl, 'Enviando invitación...', 'loading');
+
+        fetch('api/usuarios_invitar.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nombre: nombre, email: email })
+        })
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    return { ok: response.ok, data: data };
+                });
+            })
+            .then(function (result) {
+                if (result.ok && result.data.status === 'success') {
+                    let mensaje = result.data.message;
+                    if (result.data.data && result.data.data.enlace_invitacion_local) {
+                        mensaje += ' (local: ' + result.data.data.enlace_invitacion_local + ')';
+                    }
+                    setStatus(statusEl, mensaje, 'success');
+                    form.reset();
+                } else {
+                    setStatus(statusEl, result.data.message || 'No pudimos enviar la invitación.', 'error');
+                }
+            })
+            .catch(function () {
+                setStatus(statusEl, 'Error de conexión. Intenta de nuevo.', 'error');
+            })
+            .finally(function () {
+                submitBtn.disabled = false;
+            });
     });
 }
