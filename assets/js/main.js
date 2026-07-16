@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     initLeadForm();
     initClubLectura();
+    initScrollTop();
 });
 
 function initLeadForm() {
@@ -160,4 +161,21 @@ function showClubModal(modal) {
 function hideClubModal(modal) {
     modal.classList.remove('is-visible');
     modal.setAttribute('aria-hidden', 'true');
+}
+
+/* ── BOTÓN FLOTANTE SCROLL-TO-TOP ──────────────────────────────────────────── */
+
+function initScrollTop() {
+    const btn = document.getElementById('btn-scroll-top');
+    if (!btn) {
+        return;
+    }
+
+    window.addEventListener('scroll', function () {
+        btn.classList.toggle('is-active', window.scrollY > 400);
+    });
+
+    btn.addEventListener('click', function () {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
 }

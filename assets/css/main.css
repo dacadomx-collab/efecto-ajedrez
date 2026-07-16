@@ -743,6 +743,170 @@ a {
     color: var(--ajedrez-accent);
 }
 
+/* ── BOTÓN "VOLVER AL INICIO" (header, club-lectura.html) ─────────────────── */
+
+.site-header__back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.55rem 1.1rem;
+    border-radius: 999px;
+    border: 1px solid rgba(233, 30, 99, 0.4);
+    color: var(--ajedrez-text-muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: color 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.site-header__back-btn:hover {
+    color: var(--ajedrez-text);
+    border-color: var(--ajedrez-accent);
+    background-color: var(--ajedrez-accent-soft);
+}
+
+/* ── PERFIL DE LA ANFITRIONA — Paola Palomares ────────────────────────────── */
+
+.club-host-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 2rem auto 0;
+    padding: 0.75rem 1.5rem 0.75rem 0.75rem;
+    background-color: var(--ajedrez-bg-elevated);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 999px;
+    text-align: left;
+}
+
+.club-host-card__photo {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--ajedrez-accent);
+    box-shadow: 0 0 18px rgba(233, 30, 99, 0.45);
+}
+
+.club-host-card__info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.club-host-card__eyebrow {
+    color: var(--ajedrez-accent);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.club-host-card__name {
+    font-family: var(--font-heading);
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--ajedrez-text);
+}
+
+.club-host-card__role {
+    font-family: var(--font-base);
+    color: var(--ajedrez-text-muted);
+    font-size: 0.82rem;
+    margin: 0;
+}
+
+/* ── BOTÓN FLOTANTE SCROLL-TO-TOP ──────────────────────────────────────────── */
+
+.club-scroll-top {
+    position: fixed;
+    right: 1.25rem;
+    bottom: 1.25rem;
+    z-index: 60;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    border: none;
+    background-color: var(--ajedrez-accent);
+    color: var(--ajedrez-text);
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(12px);
+    pointer-events: none;
+    box-shadow: 0 8px 24px rgba(233, 30, 99, 0.35);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.club-scroll-top.is-active {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.club-scroll-top:hover {
+    transform: translateY(-3px);
+}
+
+/* ── BANNER PROMOCIONAL "CÍRCULO DE LECTURA" (index.php) ──────────────────── */
+
+.club-promo {
+    background:
+        radial-gradient(circle at 15% 30%, var(--ajedrez-accent-soft), transparent 55%),
+        var(--ajedrez-bg-elevated);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius-base);
+    padding: 2.25rem 1.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 1.75rem;
+    text-align: left;
+}
+
+.club-promo__avatar {
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--ajedrez-accent);
+    box-shadow: 0 0 18px rgba(233, 30, 99, 0.45);
+    flex-shrink: 0;
+}
+
+.club-promo__body {
+    flex: 1 1 320px;
+    max-width: 520px;
+}
+
+.club-promo__eyebrow {
+    display: inline-block;
+    color: var(--ajedrez-accent);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.78rem;
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+}
+
+.club-promo__title {
+    font-family: var(--font-heading);
+    font-size: clamp(1.2rem, 2.6vw, 1.6rem);
+    margin: 0 0 0.5rem;
+}
+
+.club-promo__text {
+    color: var(--ajedrez-text-muted);
+    margin: 0;
+}
+
+.club-promo__cta {
+    flex-shrink: 0;
+}
+
 /* ── RESPONSIVE — MOBILE FIRST ────────────────────────────────────────────── */
 
 @media (max-width: 720px) {
@@ -760,5 +924,26 @@ a {
 
     .club-modal__panel {
         padding: 1.75rem 1.5rem;
+    }
+
+    .site-header__back-btn {
+        padding: 0.5rem 0.85rem;
+        font-size: 0.8rem;
+    }
+
+    .club-host-card {
+        flex-direction: column;
+        text-align: center;
+        border-radius: var(--radius-base);
+        padding: 1.25rem;
+    }
+
+    .club-host-card__info {
+        align-items: center;
+    }
+
+    .club-promo {
+        flex-direction: column;
+        text-align: center;
     }
 }

@@ -154,6 +154,20 @@
             </div>
         </section>
 
+        <section id="club-lectura" class="section" aria-labelledby="club-promo-title">
+            <div class="container">
+                <div class="club-promo">
+                    <img src="assets/img/PaoPalomares.jpeg" alt="Paola Palomares" class="club-promo__avatar">
+                    <div class="club-promo__body">
+                        <span class="club-promo__eyebrow">Nuevo · Comunidad Tzunum</span>
+                        <h2 id="club-promo-title" class="club-promo__title">Círculo de Lectura con Pao Palomares</h2>
+                        <p class="club-promo__text">Martes y jueves, 8:30 p.m. — un espacio para desconectar, crecer y compartir en comunidad, moviendo nuestras piezas con estrategia.</p>
+                    </div>
+                    <a href="club-lectura.html" class="btn btn--primary club-promo__cta">Unirme al Círculo de Lectura</a>
+                </div>
+            </div>
+        </section>
+
         <section id="botiquin" class="section" aria-labelledby="botiquin-title">
             <div class="container">
                 <div class="section__heading">
