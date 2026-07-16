@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initLeadForm();
     initClubLectura();
     initScrollTop();
+    initClubHostPhoto();
 });
 
 function initLeadForm() {
@@ -177,5 +178,39 @@ function initScrollTop() {
 
     btn.addEventListener('click', function () {
         window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+}
+
+/* ── LIGHTBOX ATÓMICO — Foto de la anfitriona (club-lectura.html) ─────────── */
+
+function initClubHostPhoto() {
+    const photo = document.getElementById('club-host-photo');
+    const backdrop = document.getElementById('club-photo-backdrop');
+    if (!photo || !backdrop) {
+        return;
+    }
+
+    function toggleMagnify() {
+        const isMagnified = photo.classList.toggle('is-magnified');
+        backdrop.classList.toggle('is-visible', isMagnified);
+    }
+
+    function closeMagnify() {
+        photo.classList.remove('is-magnified');
+        backdrop.classList.remove('is-visible');
+    }
+
+    photo.addEventListener('click', toggleMagnify);
+    photo.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            toggleMagnify();
+        }
+    });
+    backdrop.addEventListener('click', closeMagnify);
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            closeMagnify();
+        }
     });
 }

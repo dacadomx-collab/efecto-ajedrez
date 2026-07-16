@@ -771,7 +771,7 @@ a {
     display: inline-flex;
     align-items: center;
     gap: 1rem;
-    margin: 2rem auto 0;
+    margin: 1.25rem auto 1.5rem;
     padding: 0.75rem 1.5rem 0.75rem 0.75rem;
     background-color: var(--ajedrez-bg-elevated);
     border: 1px solid rgba(255, 255, 255, 0.06);
@@ -786,6 +786,37 @@ a {
     object-fit: cover;
     border: 2px solid var(--ajedrez-accent);
     box-shadow: 0 0 18px rgba(233, 30, 99, 0.45);
+    cursor: zoom-in;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.club-host-card__photo.is-magnified {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: min(420px, 82vw);
+    height: min(420px, 82vw);
+    border-radius: 18px;
+    transform: translate(-50%, -50%);
+    z-index: 210;
+    cursor: zoom-out;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+
+.club-photo-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background-color: rgba(10, 12, 20, 0.85);
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.club-photo-backdrop.is-visible {
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .club-host-card__info {
