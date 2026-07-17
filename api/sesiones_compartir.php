@@ -11,6 +11,8 @@ require_once __DIR__ . '/conexion.php';
 const CLUB_SESSION_DAYS = [2, 4]; // 2 = martes, 4 = jueves
 const CLUB_SESSION_HOUR = 20;
 const CLUB_SESSION_MINUTE = 30;
+const MATERIAL_TAMANO_MAXIMO_BYTES = 20 * 1024 * 1024; // 20MB
+const MATERIAL_DIRECTORIO_DESTINO = __DIR__ . '/../uploads/materiales-protegidos/';
 
 // CAPA 3 — Método HTTP
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -26,17 +28,13 @@ if ($actor['rol'] !== 'super_admin' && !esModuloVisible($pdo, 'invitados', (stri
     jsonResponse('error', 'No tienes permisos para esta acción.', [], 403);
 }
 
-// CAPA 4 — Payload + Sanitización
-if (stripos($_SERVER['CONTENT_TYPE'] ?? '', 'application/json') === false) {
-    jsonResponse('error', 'Content-Type debe ser application/json.', [], 415);
-}
-
-$raw = file_get_contents('php://input');
-$payload = json_decode((string) $raw, true);
-
-$enlace = isset($payload['enlace']) ? trim((string) $payload['enlace']) : '';
-$tema = isset($payload['tema']) ? trim(strip_tags((string) $payload['tema'])) : '';
-$fechaHoraCruda = isset($payload['fecha_hora']) ? trim((string) $payload['fecha_hora']) : '';
+// CAPA 4 — Payload (multipart/form-data — el Planeador Live es una sola
+// acción que puede incluir el PDF del material junto con los datos de la
+// sesión, en vez de dos formularios/endpoints separados).
+$enlace = isset($_POST['enlace']) ? trim((string) $_POST['enlace']) : '';
+$tema = isset($_POST['tema']) ? trim(strip_tags((string) $_POST['tema'])) : '';
+$fechaHoraCruda = isset($_POST['fecha_hora']) ? trim((string) $_POST['fecha_hora']) : '';
+$mensaje = isset($_POST['mensaje']) ? trim(strip_tags((string) $_POST['mensaje'])) : '';
 
 if ($enlace === '' || filter_var($enlace, FILTER_VALIDATE_URL) === false || mb_strlen($enlace) > 255) {
     jsonResponse('error', 'El enlace de la sesión no es válido.', [], 422);
@@ -44,6 +42,38 @@ if ($enlace === '' || filter_var($enlace, FILTER_VALIDATE_URL) === false || mb_s
 
 if (mb_strlen($tema) > 200) {
     jsonResponse('error', 'El tema no puede superar 200 caracteres.', [], 422);
+}
+
+if (mb_strlen($mensaje) > 500) {
+    jsonResponse('error', 'El mensaje personalizado no puede superar 500 caracteres.', [], 422);
+}
+
+// Material PDF — opcional. Mismo patrón de validación que MODULO_03_CRM_
+// EVENTOS_EN_VIVO §7 (MIME real vía finfo, nunca extensión/Content-Type
+// declarado por el navegador).
+$materialTmp = null;
+if (isset($_FILES['material']) && $_FILES['material']['error'] !== UPLOAD_ERR_NO_FILE) {
+    if ($_FILES['material']['error'] !== UPLOAD_ERR_OK) {
+        jsonResponse('error', 'No se pudo recibir el archivo PDF.', [], 422);
+    }
+
+    if (!is_uploaded_file($_FILES['material']['tmp_name'])) {
+        jsonResponse('error', 'Archivo inválido.', [], 422);
+    }
+
+    if ($_FILES['material']['size'] > MATERIAL_TAMANO_MAXIMO_BYTES) {
+        jsonResponse('error', 'El archivo supera el máximo de 20MB.', [], 422);
+    }
+
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mimeReal = finfo_file($finfo, $_FILES['material']['tmp_name']);
+    finfo_close($finfo);
+
+    if ($mimeReal !== 'application/pdf') {
+        jsonResponse('error', 'Solo se permiten archivos PDF.', [], 422);
+    }
+
+    $materialTmp = $_FILES['material']['tmp_name'];
 }
 
 // Próxima fecha de sesión (mismo criterio que el countdown público del
@@ -92,6 +122,28 @@ try {
     ]);
     $sesionId = (int) $pdo->lastInsertId();
 
+    // Material PDF opcional — mismo renombrado criptográfico y directorio
+    // protegido que MODULO_03_CRM_EVENTOS_EN_VIVO §7 (material_subir.php
+    // sigue existiendo como endpoint standalone; el Planeador Live solo
+    // reutiliza la misma lógica de guardado para no duplicar el archivo
+    // físico entre dos rutas de subida distintas).
+    if ($materialTmp !== null) {
+        if (!is_dir(MATERIAL_DIRECTORIO_DESTINO) && !mkdir(MATERIAL_DIRECTORIO_DESTINO, 0755, true) && !is_dir(MATERIAL_DIRECTORIO_DESTINO)) {
+            throw new RuntimeException('No se pudo preparar el directorio de subida.');
+        }
+
+        $nombreArchivo = bin2hex(random_bytes(16)) . '.pdf';
+        $rutaDestino = MATERIAL_DIRECTORIO_DESTINO . $nombreArchivo;
+        $rutaRelativa = 'uploads/materiales-protegidos/' . $nombreArchivo;
+
+        if (!move_uploaded_file($materialTmp, $rutaDestino)) {
+            throw new RuntimeException('No se pudo guardar el archivo PDF.');
+        }
+
+        $stmt = $pdo->prepare('UPDATE historial_sesiones SET material_pdf_path = :ruta WHERE id = :id');
+        $stmt->execute([':ruta' => $rutaRelativa, ':id' => $sesionId]);
+    }
+
     $stmt = $pdo->prepare('SELECT id, nombre, email FROM registro_interesados');
     $stmt->execute();
     $interesados = $stmt->fetchAll();
@@ -121,6 +173,7 @@ try {
             'Tu sesión del Círculo de Lectura está por comenzar',
             '<p>Hola ' . htmlspecialchars($interesado['nombre'], ENT_QUOTES, 'UTF-8') . ',</p>'
             . '<p>La próxima sesión del Círculo de Lectura' . ($tema !== '' ? ' — "' . htmlspecialchars($tema, ENT_QUOTES, 'UTF-8') . '"' : '') . ' está por comenzar.</p>'
+            . ($mensaje !== '' ? '<p>' . nl2br(htmlspecialchars($mensaje, ENT_QUOTES, 'UTF-8')) . '</p>' : '')
             . '<p><a href="' . htmlspecialchars($enlaceCheckin, ENT_QUOTES, 'UTF-8') . '">Ingresar a la sesión</a></p>'
         );
 
@@ -143,4 +196,10 @@ try {
     // CAPA 6 — Try/Catch global
     error_log('[' . date('Y-m-d H:i:s') . '] sesiones_compartir.php: ' . $e->getCode() . ' — ' . $e->getMessage() . PHP_EOL, 3, __DIR__ . '/../logs/error.log');
     jsonResponse('error', 'No pudimos compartir la sesión. Intenta de nuevo.', [], 500);
+} catch (RuntimeException $e) {
+    $pdo->rollBack();
+
+    // CAPA 6 — Try/Catch global
+    error_log('[' . date('Y-m-d H:i:s') . '] sesiones_compartir.php archivo: ' . $e->getMessage() . PHP_EOL, 3, __DIR__ . '/../logs/error.log');
+    jsonResponse('error', 'No pudimos guardar el archivo PDF. Intenta de nuevo.', [], 500);
 }

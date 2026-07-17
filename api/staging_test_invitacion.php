@@ -28,15 +28,13 @@ $env = obtenerEnv();
 $tokenPreview = bin2hex(random_bytes(32));
 $enlacePreview = rtrim($env['APP_URL'] ?? '', '/') . '/invitacion.php?token=' . $tokenPreview;
 
-// Cuerpo idéntico, campo por campo, al que arma api/usuarios_invitar.php —
-// el productor debe auditar exactamente el mismo diseño que recibirá
+// Misma función de plantilla que usa api/usuarios_invitar.php — el
+// productor debe auditar exactamente el mismo diseño que recibirá
 // cualquier invitado real, sin ningún texto de vista previa visible.
 $enviado = enviarCorreoTransaccional(
     'preview@efecto-ajedrez.local',
     'Invitación al Dashboard — El Efecto Ajedrez',
-    '<p>Hola Paola Palomares,</p>'
-    . '<p>Has sido invitado(a) al Dashboard de El Efecto Ajedrez. Define tu contraseña en el siguiente enlace (válido por 48 horas):</p>'
-    . '<p><a href="' . htmlspecialchars($enlacePreview, ENT_QUOTES, 'UTF-8') . '">Aceptar invitación</a></p>'
+    construirPlantillaInvitacion('Paola Palomares', $enlacePreview)
 );
 
 if ($enviado) {

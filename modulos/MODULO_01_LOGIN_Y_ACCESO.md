@@ -1,6 +1,6 @@
 # MODULO_01_LOGIN_Y_ACCESO — Ley Suprema de Autenticación
 
-**Clasificación:** Módulo Genérico de Arquitectura y Diseño Técnico | **Versión:** 6.0 (+ Navegación Global, RBAC Dinámico por Módulo, Núcleo Cognitivo de Bienvenida)
+**Clasificación:** Módulo Genérico de Arquitectura y Diseño Técnico | **Versión:** 8.0 (+ Navegación Global, RBAC Dinámico por Módulo, Núcleo Cognitivo de Bienvenida, Jerarquía de Widgets Acción→Estado→Historial, Ledgers Paginados, Entregabilidad Anti-SPAM Universal, Módulos con Rol Fijo No-Delegable, Formato Regional de Fecha Configurable)
 **Alcance:** Documento agnóstico, reutilizable por cualquier proyecto de `{{HOLDING_NAME}}`. Ningún nombre de proyecto, cliente o dominio real debe aparecer aquí — sustituir siempre por `{{PROJECT_NAME}}`, `{{TABLE_PREFIX}}`, etc.
 **Relación con v2.0:** Este documento es el **blueprint técnico ejecutable** (SQL → PHP → Frontend). La v2.0 (To-Do list + checklist de madurez enterprise) permanece como anexo de gobernanza al final de este archivo — úsala para auditar qué tan lejos del "ideal enterprise" está la implementación concreta que este v4.0 describe.
 
@@ -192,12 +192,43 @@ Respuesta JSON { status, message, data }
 }
 ```
 
+**Regla de limpieza del contrato (cero fugas de entorno):** ningún campo de
+`data` ni de `message` puede contener rutas locales, URLs de depuración,
+nombres de host internos, stack traces o cualquier detalle de configuración
+de entorno (`{{APP_ENV}}`, rutas de filesystem, DSN, etc.). Este tipo de
+información es exclusivamente para operación interna y viaja **únicamente**
+a `error_log` (Capa 6) — nunca al cliente HTTP, ni siquiera en entornos de
+desarrollo local. Si un endpoint necesita generar un enlace de un solo uso
+(invitación, recuperación de contraseña) para trazabilidad manual, el enlace
+se registra en el log de errores del servidor, no en la respuesta JSON. El
+canal legítimo para que el enlace llegue a su destinatario es el correo
+transaccional (§9.4), nunca la respuesta de la API.
+
 ### 2.2 Prevención de fuerza bruta y timing attacks (transversal a Capas 4-6)
 
 - **Anti-enumeración:** si el email no existe, ejecutar igualmente `password_verify()` contra un hash BCrypt "dummy" precalculado — el tiempo de respuesta debe ser indistinguible entre "usuario no existe" y "contraseña incorrecta". Mensaje de error siempre: `"Credenciales inválidas."`.
 - **Tarpitting progresivo:** cada `login_fallido` incrementa `intentos_fallidos`; al superar el umbral (`{{MAX_INTENTOS}}`, ej. 5), se escribe `bloqueado_hasta = NOW() + INTERVAL {{MINUTOS_BLOQUEO}} MINUTE` y se retorna 429 con mensaje genérico, sin revelar el umbral exacto.
 - **Rate limiting multivectorial:** el límite se evalúa por `device_hash` **y** por `ip_hash` de forma independiente — un atacante rotando IP sigue frenado por el device hash, y viceversa.
 - **Reset de contador:** `intentos_fallidos = 0` únicamente tras un `login_exitoso` verificado en Capa 5.
+
+### 2.3 Diagnóstico responsable de fallas de conexión a BD (`DB_HOST`)
+
+Un `500` en producción con `PDOException` en el log **nunca** se resuelve alterando `{{DB_HOST}}` de forma condicional en código (ej. "si el dominio es de producción, forzar `localhost`") sin haber leído primero el error real:
+
+- `{{DB_HOST}}` suele apuntar a un servidor de base de datos físicamente distinto al del hosting web (de ahí el subdominio propio, ej. `{{DB_SUBHOST}}.{{PROVEEDOR}}.com`, en vez de `localhost`) — es un patrón estándar de hosting compartido. Forzar `localhost` en ese escenario **no evade un firewall**, apunta a un servidor MySQL que probablemente ni siquiera existe en esa máquina, y convierte una falla diagnosticable en una desconexión total.
+- Antes de tocar la clase `Database`, se lee el `error_log` real del entorno afectado — el mensaje de `PDOException` (código SQLSTATE + texto) casi siempre apunta a la causa real: credenciales desincronizadas entre `.env` de cada entorno, un límite de conexiones concurrentes del proveedor, una tabla/columna que existe en un entorno pero no en otro, o simplemente código nuevo desplegado sin que la migración SQL correspondiente se haya ejecutado ahí.
+- Si el mismo `{{DB_HOST}}` ya fue probado exitosamente desde otro entorno (ej. local) contra la **misma** base de datos compartida, eso es evidencia fuerte de que el host es alcanzable — la causa del `500` casi seguro no es de red/firewall, y buscarla ahí retrasa encontrar la causa real.
+- La IA ejecutora nunca debe "adivinar" un fix de infraestructura de producción sin haber visto el error real — pedir el log es la acción correcta, no un bloqueo.
+
+### 2.4 Ley de Oro de Entregabilidad Anti-SPAM (requisito universal, toda mutación por correo)
+
+Todo correo transaccional saliente del holding — sin excepción de plantilla ni de endpoint — debe cumplir, a nivel de infraestructura (no solo de una plantilla puntual), con:
+
+- **Dominio de origen limpio:** el remitente (`{{SMTP_USER}}`/`{{MAIL_FROM_NAME}}`) nunca lleva prefijos de desarrollo (`test-`, `staging-`, `dev.`) en el entorno de producción — un dominio con apariencia de entorno no productivo es una señal fuerte de SPAM para los filtros de los ISPs.
+- **URLs absolutas siempre, vía `{{APP_URL}}`:** toda imagen, logotipo o enlace firmado dentro del cuerpo del correo se construye concatenando la variable de entorno `{{APP_URL}}` — nunca una ruta relativa (los clientes de correo no tienen noción del dominio del sitio que los envía).
+- **Cabecera `List-Unsubscribe` (RFC 2369/8058), a nivel de infraestructura de envío:** el cliente SMTP centralizado (ej. `enviarCorreoTransaccional()`) agrega `List-Unsubscribe: <mailto:{{CORREO_CONTACTO}}?subject=...>` y `List-Unsubscribe-Post: List-Unsubscribe=One-Click` a **toda** cabecera saliente, sin que cada llamador tenga que declararlo — esto cubre incluso los correos que usan una plantilla simple/no premium (ej. notificaciones masivas de evento), que de otro modo quedarían fuera del blindaje si solo se documentara a nivel de una plantilla específica.
+- **Footer de cumplimiento visible (CAN-SPAM):** además de la cabecera técnica, el cuerpo HTML incluye un pie visible con el placeholder de dirección postal física del remitente y un enlace funcional de baja (`mailto:` o web) — ver MODULO_01 §9.4 para la implementación completa en la plantilla premium.
+- Sin esta estructura completa (cabecera + footer visible + URLs absolutas + dominio limpio), el correo puede ser filtrado silenciosamente por Gmail/Yahoo/Outlook — no como excepción, sino como comportamiento esperado del proveedor. Es un requisito de arranque, no una mejora opcional posterior.
 
 ---
 
@@ -603,6 +634,16 @@ function initDashPanelSwitcher() {
 - `data-panel-target=""` (cadena vacía, ej. el ítem "Inicio") es el estado de reposo — oculta todos los paneles y deja visible solo el bloque de bienvenida.
 - Un panel oculto por `hidden` **nunca** se retira del DOM — sigue siendo el mismo formulario/tabla con su estado, solo se re-muestra; evita perder el progreso de un formulario a medio llenar por navegar a otra sección y volver.
 
+### 5.3.3 Jerarquía Ejecutiva por Widgets (Crowd Control dentro de un panel)
+
+Una vez dentro de un panel operativo (Sección 5.3.2), el contenido **tampoco** se presenta como una sábana plana de formularios amontonados uno tras otro. Se ordena en tres capas de prioridad visual, cada una un bloque (`{{WIDGET_CLASS}}`) independiente y visualmente distinto del resto:
+
+- **Sección A — Acceso Rápido / Planeador:** lo primero que ve el operador al entrar al panel — un solo widget compacto y destacado (fondo elevado + acento de marca) que concentra la acción operativa que más se repite en el día a día. Si esa acción histórica requería varios formularios encadenados (ej. crear un evento + adjuntar un archivo + redactar un mensaje, antes en 2-3 formularios y 2-3 endpoints separados), se fusiona en **un solo formulario y un solo endpoint** que reciba todo junto (`multipart/form-data` si incluye archivo) — el operador ejecuta un único botón de acción central, no una secuencia de pasos.
+- **Sección B — Métricas Activas en Tarjetas (KPIs):** justo debajo, un grid de tarjetas (`{{TIMETABLE_PANEL}}`) que responde "¿cómo va todo ahora mismo?" sin que el operador tenga que abrir nada ni hacer clic — cada tarjeta es un solo dato (fecha, contador, estado activo), nunca una tabla completa.
+- **Sección C — Historial / Ledger:** al final, comprimido y con menor peso visual, el registro histórico tabular (Sección 9.3/5 de los módulos de auditoría) — es información de consulta ocasional, no la razón por la que el operador abrió el panel.
+
+Este ordenamiento (Acción → Estado → Historial) es el patrón por defecto para **cualquier** panel operativo del Dashboard con más de un formulario o tabla — no solo el que lo originó.
+
 ### 5.4 Controles de Navegación Globales
 
 **Scroll-to-Top:** botón flotante fijo (esquina inferior, `position: fixed`) oculto por defecto, que se activa vía clase (`opacity`/`transform`, nunca `display` a secas para permitir transición) cuando `window.scrollY` supera un umbral (ej. 400px). Reutiliza el mismo patrón atómico de transición ya establecido en este módulo (Sección 4.5/5.3) — nunca dispara reflow.
@@ -930,7 +971,13 @@ try {
 
 ### 9.3 Registro de Ingreso (Auditoría de Accesos Exitosos)
 
-Subsección exclusiva de `super_admin` — quién entró, cuándo y desde dónde:
+Subsección exclusiva de `super_admin` — quién entró, cuándo y desde dónde. A diferencia de los módulos que sí pasan por el Mapeo Dinámico de Permisos (Sección 6.1, donde un `super_admin` puede habilitar visibilidad para `admin`), este módulo de auditoría **nunca** es delegable — ningún rol distinto de `super_admin` puede verlo, ni siquiera si el `super_admin` lo intentara habilitar en la matriz. El blindaje es doble y redundante (defensa en profundidad):
+
+- **Capa de presentación:** el bloque HTML completo del ledger vive detrás de un `if ($rolActor === 'super_admin')` explícito y separado del resto de condicionales de visibilidad de módulo — nunca depende de `esModuloVisible()`.
+- **Capa de API:** todo endpoint que lee o muta este ledger (listado paginado, borrado) exige `requireAuth($pdo, ['super_admin'])` de forma literal — un intento de `admin` de consumir el endpoint directamente (sin pasar por la UI) recibe `403 Forbidden` igual que si intentara acceder sin sesión válida en absoluto. La UI oculta el enlace; el backend es quien realmente decide.
+
+```sql
+ALTER TABLE `{{TABLE_PREFIX}}log_actividad`
 
 ```sql
 ALTER TABLE `{{TABLE_PREFIX}}log_actividad`
@@ -942,6 +989,49 @@ ALTER TABLE `{{TABLE_PREFIX}}log_actividad`
 
 - Estas columnas se pueblan **únicamente** en el evento `login_exitoso` — nunca en `login_fallido` ni en ningún otro evento. Resolver geolocalización en cada intento fallido abriría una vía de amplificación: un atacante de fuerza bruta podría agotar el límite de tasa del proveedor externo de geolocalización, o simplemente ralentizar el endpoint de login con latencia de red innecesaria en su ruta más sensible.
 - El resto de eventos siguen usando exclusivamente `ip_hash` (Sección 1.2) para correlación sin exponer PII — este registro "en claro" es la excepción deliberada, limitada al único evento que el `super_admin` necesita auditar con detalle real.
+
+**Anclaje de zona horaria (obligatorio, evita bugs latentes de negocio):**
+
+- MySQL/MariaDB almacena `created_at` (`TIMESTAMP`/`DATETIME` con `CURRENT_TIMESTAMP`) en **UTC** por defecto. PHP, si no se le indica explícitamente una zona horaria, hereda la del sistema operativo del servidor — que puede no coincidir ni con UTC ni con la zona operativa real del proyecto. Esto es un bug silencioso: cualquier cálculo de fecha de negocio (recordatorios, "próximo martes/jueves a las 20:30", vigencias de token) queda ejecutándose en una zona horaria arbitraria e indocumentada.
+- **Fix obligatorio:** anclar `date_default_timezone_set('{{TIMEZONE}}')` (ej. `America/Mexico_City`) una sola vez, en el archivo de arranque/helpers que se carga en (casi) todas las rutas — nunca repetido por archivo, nunca omitido.
+- **Conversión de UTC a la zona de exhibición:** si la zona operativa de negocio difiere de la zona de exhibición al usuario final (ej. negocio anclado en `America/Mexico_City` pero el público objetivo está en `{{TIMEZONE_EXHIBICION}}`, ej. `America/Mazatlan`), construir un formateador dedicado que reciba el string UTC crudo de la BD y devuelva el string ya convertido — nunca convertir "a mano" con sumas/restas de horas (no contempla horario de verano ni offsets fraccionarios).
+- **Formato regional estricto, configurable por el dueño del proyecto:** si el proyecto exige abreviaturas de mes en un idioma específico (ej. español: `Ene`, `Feb`, `Mar`...), no depender de `ext-intl` ni de la locale del servidor (impredecible entre entornos local/staging/producción) — mapear el mes numérico a un arreglo estático propio. El **orden** de los componentes (día-mes vs. mes-día) y el **padding** (día/hora con o sin ceros a la izquierda) son decisiones de formato regional que el dueño del proyecto define — no hay un único formato "correcto" universal. Dos formas de ejemplo igualmente válidas, según lo que pida el proyecto consumidor: `16 Ene 2026, 8:05 am` (día-mes, sin padding) o `Ene 16, 2026, 08:05 am` (mes-día, con padding de 2 dígitos en día y hora). Siempre `am`/`pm` en minúsculas salvo que el proyecto pida lo contrario.
+
+### 9.4 Plantilla Premium del Correo de Invitación (Estética de Marca Configurable)
+
+El correo transaccional de invitación **no** es un `<p>` suelto — es una pieza de marca. Reglas de construcción:
+
+- **Campos 100% dinámicos, cero hardcodeo:** la función constructora recibe como parámetros el nombre y el `{{USER_EMAIL}}` **exactos** capturados en el formulario del operador — nunca un valor de ejemplo ni una cuenta de prueba escrita directamente en el cuerpo del mensaje. La única excepción documentada y deliberada es el botón de previsualización en staging (Sección de auditoría del Dashboard), que no tiene un destinatario real todavía y por eso usa un nombre de ejemplo explícitamente marcado como tal en el código — nunca se confunde con el flujo de producción. El transporte de red puede desviarse a una cuenta de auditoría mientras `{{APP_ENV}} != production` (Sección de staging, más abajo), pero el HTML interno del correo siempre refleja al destinatario real — mostrar el `{{USER_EMAIL}}` real dentro del propio cuerpo (no solo en la cabecera SMTP `To:`) es lo que permite auditar visualmente esa dinamización sin tener que inspeccionar cabeceras crudas.
+- **Tabla HTML + estilos inline, siempre.** Ningún cliente de correo relevante (Outlook, Yahoo, Gmail en ciertos modos) respeta `<style>` externo ni la mayoría del CSS moderno (flexbox/grid) — el layout se resuelve con `<table role="presentation">` anidadas y cada regla visual va inline, `style="..."` directo en el tag. Esta es la **única** excepción documentada a la Regla de Oro de "cero estilos inline" (Sección 4.4) — esa regla gobierna el HTML de la aplicación web, no el HTML que se transmite como cuerpo de un correo.
+- **Escala tipográfica ejecutiva:** el correo se lee en pantallas de celular con la app de correo en modo compacto — un cuerpo de texto por debajo de ~16-17px y un título por debajo de ~24px se perciben "pequeños y planos" en ese contexto, incluso si son legibles en desktop. El tamaño base del cuerpo, el título principal y el botón de acción se calibran deliberadamente por encima de los mínimos web habituales para lograr una sensación premium/ejecutiva, no solo "legible".
+- **Fondo oscuro absoluto:** contenedor principal en `{{COLOR_FONDO_OSCURO}}` (ej. `#10141E`), envuelto en un fondo exterior aún más oscuro para el "letterboxing" en clientes que centran el contenido.
+- **Acentos lumínicos:** bordes, `<hr>` y el botón de acción principal en `{{COLOR_ACENTO_NEON}}` (ej. `#E91E63`) — simulan la luz de neón de estudio de la identidad de marca.
+- **Elementos de marca obligatorios:** logo con `src` de **URL absoluta** (`{{APP_URL}}/{{LOGO_PATH}}` — nunca una ruta relativa, los clientes de correo no tienen noción del dominio del sitio) y el eslogan/tagline oficial del proyecto, en cursiva, discreto pero presente.
+- **Botón "bulletproof":** el CTA principal se construye como una `<table>` de una celda con `bgcolor` + `border-radius` en el `<td>`, no como un `<button>` ni un `<a>` con `display:inline-block` suelto — Outlook desktop (motor Word) ignora `border-radius` y buena parte del `padding` en enlaces sueltos, pero sí respeta celdas de tabla.
+- **Ecosistema de enlaces:** además del CTA principal (acción central, ej. "Configurar Mi Contraseña y Acceder al Dashboard"), una fila secundaria de enlaces de texto hacia las rutas públicas principales del proyecto (`{{URL_HOME}}`, `{{URL_MODULO_DESTACADO}}`) — el correo es también una puerta de entrada al resto del ecosistema, no solo al flujo de activación.
+- **Tono:** universal, empático, laico, protector — sin lenguaje corporativo genérico ni urgencia artificial ("¡Actúa ya!"). El proyecto consumidor adapta el copy exacto a su propia voz de marca, documentada en su Codex.
+- **Reutilización:** la plantilla vive en **una sola función** (ej. `construirPlantillaInvitacion()`) consumida tanto por el flujo real de invitación como por cualquier botón de previsualización en staging (Sección de auditoría del Dashboard) — nunca se duplica el HTML entre ambos, evita que diverjan con el tiempo.
+- **Blindaje anti-SPAM (entregabilidad):** para que proveedores como Gmail/Yahoo confíen en el remitente, todo correo transaccional masivo-potencial incluye, como bloque final del cuerpo (después del cierre de marca), un pie de cumplimiento con: (a) un bloque formal tipo dirección postal — nombre del proyecto, una línea descriptiva y una referencia geográfica general (`{{REGION_OPERATIVA}}`) — y (b) un enlace funcional de baja/unsubscribe — mínimo viable: `mailto:{{CORREO_CONTACTO}}` con `subject` prellenado, reutilizando la misma cuenta SMTP configurada en `.env` (`{{SMTP_USER}}`), nunca una dirección nueva hardcodeada. **Regla Anti-Alucinación aplicada aquí (Mandamiento 4):** si el proyecto consumidor no tiene todavía una dirección postal física real y verificable, el bloque nunca se rellena con una calle/número inventados — se usa el formato descriptivo de arriba (nombre + descripción + región) hasta que el dueño del proyecto provea la dirección real; una dirección falsa es peor para la entregabilidad a largo plazo que un formato genérico honesto. **Distinción clave:** una región operativa (ciudad/estado/país) que el dueño del proyecto **confirma explícitamente** (ej. en una instrucción directa) deja de ser una alucinación en cuanto se usa — sí puede incorporarse al `{{REGION_OPERATIVA}}` del bloque; lo que sigue prohibido es que el agente **invente** por su cuenta una calle, número o código postal que nadie le proporcionó. Este bloque va con la misma tipografía discreta (tamaño reducido, color atenuado) para no competir visualmente con el CTA principal.
+
+### 9.5 Controlador Central de Usuarios (Panel Exclusivo `super_admin`)
+
+Tabla responsiva en el Dashboard que lista **todos** los usuarios del sistema (Nombre, Correo, Rol, Estatus con badge de color por estado — `{{USER_STATUS}}` ∈ `activo`/`pendiente`/`suspendido`) con tres acciones por fila, cada una contra un endpoint independiente de 6 capas, exclusivo de `super_admin`:
+
+- **Resetear Contraseña:** invalida el hash actual (`password_hash = NULL`), regresa el `estatus` a `pendiente`, revoca cualquier sesión activa del usuario (`token_acceso = NULL`) y genera una nueva fila de invitación de vigencia corta reutilizando el mismo flujo de invitación (Sección 9.2) — el usuario recibe un correo con la plantilla premium (Sección 9.4) para redefinir su contraseña desde cero. No existe un "cambio directo" de contraseña por un tercero: el propio usuario siempre la define.
+- **Suspender Actividad:** marca `estatus = suspendido` y revoca la sesión activa (`token_acceso = NULL`) de inmediato. `login.php` debe rechazar con `403` cualquier intento de acceso mientras el `estatus` sea `suspendido`, con mensaje genérico ("Cuenta suspendida. Contacta a un administrador."), sin distinguir esta causa de otras en el tiempo de respuesta (mismo principio anti-enumeración de la Sección 2.2).
+- **Eliminar:** borra el registro (`DELETE`) apoyándose en las relaciones `ON DELETE CASCADE` ya definidas (Sección 1) para limpiar filas dependientes (invitaciones, recuperación de contraseña) — la bitácora de actividad (Sección 1.2) **no** tiene FK hacia `usuarios` deliberadamente, por lo que el historial del usuario eliminado persiste con su id numérico, íntegro y sin romper la cascada.
+- **Protección de último `super_admin`:** tanto "Suspender" como "Eliminar" verifican, antes de ejecutar, que exista al menos otro `super_admin` (activo, en el caso de suspender) además del objetivo — de lo contrario responden `422` sin tocar la fila. Evita un bloqueo total e irreversible del propio Dashboard.
+- **Auto-protección del actor:** ningún `super_admin` puede suspenderse o eliminarse a sí mismo desde este panel (`422`) — esas acciones, si son necesarias, las ejecuta otro `super_admin` distinto.
+- **Confirmación visual en línea (no `confirm()` de navegador):** las acciones destructivas (eliminar) no usan el diálogo nativo del navegador — se reemplaza el contenido de la celda de acciones por un texto de confirmación más un botón "Confirmar" de segundo paso, manteniendo la experiencia dentro del propio flujo visual del Dashboard (Regla de Oro, Sección 4.4 — cero estilos inline también aplica a este estado intermedio).
+
+### 9.6 Ledgers de Auditoría Paginados (Búsqueda + Borrado Selectivo/Masivo)
+
+Ningún ledger de auditoría (Registro de Ingreso, Sección 9.3, o cualquier tabla histórica equivalente) se renderiza completo server-side de una sola vez — crece sin límite y rompe el scroll vertical del panel. Patrón obligatorio:
+
+- **Paginación server-side real** (no solo ocultar filas con CSS/JS): un endpoint de solo lectura (ej. `{{LEDGER_LISTAR_ENDPOINT}}`, `GET`, exclusivo del rol auditor) acepta `pagina` y `buscar` por querystring, calcula `LIMIT {{REGISTROS_POR_PAGINA}} OFFSET (pagina-1)*{{REGISTROS_POR_PAGINA}}` (ej. 15) contra un `COUNT(*)` previo con el mismo filtro, y devuelve `{ registros, pagina, total_paginas, total }`. El frontend renderiza filas vía DOM (`textContent`, nunca `innerHTML` con datos del servidor) y controles "← Anterior / Siguiente →" que solo cambian `pagina` y vuelven a pedir.
+- **Buscador con debounce:** un input de texto filtra por las columnas relevantes (usuario, ubicación, etc.) vía `LIKE` parametrizado — nunca concatenado directo al SQL. Se dispara con un `debounce` (ej. 300-400ms) para no golpear el endpoint en cada tecla.
+- **Borrado selectivo vía checkboxes + borrado masivo por umbral:** un segundo endpoint de mutación (ej. `{{LEDGER_ELIMINAR_ENDPOINT}}`, `POST`, mismo rol exclusivo) acepta tres modos explícitos — `seleccionados` (array de ids marcados por checkbox), `cantidad` (elimina los N registros más antiguos primero, preservando la auditoría más reciente) y `todos`. Cada modo es una rama de validación separada, nunca un único campo ambiguo que intente adivinar la intención.
+- Ambos endpoints siguen el patrón de 6 capas estándar (Sección 2) — el de borrado, por ser destructivo e irreversible, además registra su propia entrada en la bitácora de actividad (Sección 1.2) con el modo y la cantidad eliminada, para que la purga del ledger quede ella misma auditada.
 
 ---
 

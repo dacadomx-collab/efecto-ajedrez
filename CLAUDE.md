@@ -110,7 +110,7 @@ Referencia completa: `knowledge/01_LEY_Y_PROTOCOLOS_DE_VUELO.md`
 - Utiliza la tabla de mapeo del Codex de este proyecto (`knowledge/02_CODEX_Y_SCHEMA_MAESTRO.md`) como la única verdad arquitectónica.
 
 ### 🚨 ADVERTENCIA CONFIDENCIAL — `knowledge/info.txt`
-- **PROHIBIDO** abrir, leer, parsear o incluir en cualquier commit el archivo `knowledge/info.txt` o la carpeta `knowledge/` completa.
+- **PROHIBIDO** abrir, leer, parsear o incluir en cualquier commit el archivo `knowledge/info.txt`.
 - `knowledge/` ya está excluida vía `.htaccess` (bloqueo HTTP) y `.gitignore` (`/knowledge/` — nunca se versiona).
 
 ### PROHIBIDO absolutamente:

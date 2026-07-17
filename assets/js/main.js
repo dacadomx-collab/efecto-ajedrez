@@ -22,10 +22,11 @@ document.addEventListener('DOMContentLoaded', function () {
     initInlineEditor();
     initAccordionNav();
     initDashPanelSwitcher();
-    initSesionCompartirForm();
-    initMaterialSubirForm();
+    initPlaneadorLiveForm();
     initLeadCaptureModal();
     initStagingTestInvitacion();
+    initUsuariosControlTable();
+    initRegistroIngresoLedger();
 });
 
 function initLeadForm() {
@@ -106,6 +107,34 @@ const CLUB_ACCESS_LEAD_MS = 15 * 60 * 1000; // ventana de acceso: 15 min antes
 
 let clubModalDismissedFor = null;
 
+function resolverEnlaceSesionActual() {
+    // El enlace real nunca vive en el HTML/JS del cliente — se resuelve en
+    // el backend, que solo lo entrega dentro de la ventana de tiempo
+    // autorizada (MODULO_03_CRM_EVENTOS_EN_VIVO §3.2).
+    fetch('api/sesion_actual.php', { method: 'GET' })
+        .then(function (response) {
+            return response.json();
+        })
+        .then(function (result) {
+            if (result.data && result.data.enlace) {
+                window.open(result.data.enlace, '_blank', 'noopener');
+            } else {
+                alert('La sesión aún no está disponible. Intenta de nuevo en unos minutos.');
+            }
+        })
+        .catch(function () {
+            alert('No pudimos verificar la sesión. Intenta de nuevo.');
+        });
+}
+
+function usuarioConfirmoParticipacion() {
+    try {
+        return localStorage.getItem('clubLecturaConfirmado') === '1';
+    } catch (e) {
+        return false;
+    }
+}
+
 function initClubLectura() {
     const modal = document.getElementById('club-modal');
     const accessBlock = document.getElementById('club-access');
@@ -114,27 +143,14 @@ function initClubLectura() {
     }
 
     const enterBtn = document.getElementById('club-modal-enter');
+    const liveEnterBtn = document.getElementById('club-access-enter-btn');
     const closeEls = modal.querySelectorAll('[data-club-modal-close]');
 
-    enterBtn.addEventListener('click', function () {
-        // El enlace real nunca vive en el HTML/JS del cliente — se resuelve
-        // en el backend, que solo lo entrega dentro de la ventana de tiempo
-        // autorizada (MODULO_03_CRM_EVENTOS_EN_VIVO §3.2).
-        fetch('api/sesion_actual.php', { method: 'GET' })
-            .then(function (response) {
-                return response.json();
-            })
-            .then(function (result) {
-                if (result.data && result.data.enlace) {
-                    window.open(result.data.enlace, '_blank', 'noopener');
-                } else {
-                    alert('La sesión aún no está disponible. Intenta de nuevo en unos minutos.');
-                }
-            })
-            .catch(function () {
-                alert('No pudimos verificar la sesión. Intenta de nuevo.');
-            });
-    });
+    enterBtn.addEventListener('click', resolverEnlaceSesionActual);
+
+    if (liveEnterBtn) {
+        liveEnterBtn.addEventListener('click', resolverEnlaceSesionActual);
+    }
 
     closeEls.forEach(function (el) {
         el.addEventListener('click', function () {
@@ -179,10 +195,35 @@ function checkClubSessionWindow(modal, accessBlock) {
     const accessOpensAt = sessionStart.getTime() - CLUB_ACCESS_LEAD_MS;
     const sessionEndsAt = sessionStart.getTime() + CLUB_SESSION_DURATION_MS;
     const isLiveWindow = now >= accessOpensAt && now <= sessionEndsAt;
+    const confirmado = usuarioConfirmoParticipacion();
 
     accessBlock.classList.toggle('club-access--live', isLiveWindow);
 
-    if (isLiveWindow && clubModalDismissedFor !== sessionStart.getTime()) {
+    // El botón/enlace de acceso a la Sala de Check-In solo se revela para
+    // quienes ya confirmaron su participación en el modal de registro —
+    // el interés inicial (sin confirmar) nunca es suficiente por sí solo,
+    // mismo principio que MODULO_03_CRM_EVENTOS_EN_VIVO §7 aplica a la
+    // descarga de material.
+    const hintEl = document.getElementById('club-access-hint');
+    const liveEnterBtn = document.getElementById('club-access-enter-btn');
+
+    if (liveEnterBtn) {
+        liveEnterBtn.hidden = !(isLiveWindow && confirmado);
+    }
+
+    if (hintEl) {
+        if (!confirmado) {
+            hintEl.textContent = 'Regístrate para desbloquear tu acceso a la sesión en vivo.';
+            hintEl.hidden = false;
+        } else if (!isLiveWindow) {
+            hintEl.textContent = 'Ya estás confirmado(a) — tu acceso se habilita 15 minutos antes de comenzar.';
+            hintEl.hidden = false;
+        } else {
+            hintEl.hidden = true;
+        }
+    }
+
+    if (isLiveWindow && confirmado && clubModalDismissedFor !== sessionStart.getTime()) {
         showClubModal(modal);
     } else if (!isLiveWindow) {
         hideClubModal(modal);
@@ -589,11 +630,7 @@ function initUsuarioInvitarForm() {
             })
             .then(function (result) {
                 if (result.ok && result.data.status === 'success') {
-                    let mensaje = result.data.message;
-                    if (result.data.data && result.data.data.enlace_invitacion_local) {
-                        mensaje += ' (local: ' + result.data.data.enlace_invitacion_local + ')';
-                    }
-                    setStatus(statusEl, mensaje, 'success');
+                    setStatus(statusEl, result.data.message, 'success');
                     form.reset();
                 } else {
                     setStatus(statusEl, result.data.message || 'No pudimos enviar la invitación.', 'error');
@@ -1205,23 +1242,26 @@ function initDashPanelSwitcher() {
     });
 }
 
-/* ── ORQUESTADOR DE SESIONES EN VIVO (dashboard.php, Invitados Confirmados) ─ */
+/* ── PLANEADOR LIVE — Widget único de la Sección A (dashboard.php) ────────── */
+// Reemplaza los dos formularios previos (compartir sesión + subir material
+// por separado) por una sola acción: enlace, fecha, PDF y mensaje viajan
+// juntos a api/sesiones_compartir.php (multipart/form-data), que crea la
+// sesión, guarda el material si se adjuntó, y notifica a los interesados —
+// todo en un único "Compartir" (Re-Ingeniería del Dashboard, Crowd Control).
 
-function initSesionCompartirForm() {
-    const form = document.getElementById('sesion-compartir-form');
+function initPlaneadorLiveForm() {
+    const form = document.getElementById('planeador-live-form');
     if (!form) {
         return;
     }
 
-    const statusEl = document.getElementById('sesion-compartir-status');
+    const statusEl = document.getElementById('planeador-live-status');
     const submitBtn = form.querySelector('.lead-form__submit');
 
     form.addEventListener('submit', function (event) {
         event.preventDefault();
 
-        const enlace = form.elements.enlace.value.trim();
-        const tema = form.elements.tema.value.trim();
-        const fechaHora = form.elements.fecha_hora.value.trim();
+        const formData = new FormData(form);
 
         submitBtn.disabled = true;
         setStatus(statusEl, 'Compartiendo y notificando...', 'loading');
@@ -1229,8 +1269,7 @@ function initSesionCompartirForm() {
         fetch('api/sesiones_compartir.php', {
             method: 'POST',
             credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ enlace: enlace, tema: tema, fecha_hora: fechaHora })
+            body: formData
         })
             .then(function (response) {
                 return response.json().then(function (data) {
@@ -1250,62 +1289,6 @@ function initSesionCompartirForm() {
             })
             .catch(function () {
                 setStatus(statusEl, 'Error de conexión. Intenta de nuevo.', 'error');
-                submitBtn.disabled = false;
-            });
-    });
-}
-
-/* ── CARGA PROTEGIDA DE MATERIAL LITERARIO (dashboard.php, PDF Uploader) ──── */
-
-function initMaterialSubirForm() {
-    const form = document.getElementById('material-subir-form');
-    if (!form) {
-        return;
-    }
-
-    const statusEl = document.getElementById('material-subir-status');
-    const submitBtn = form.querySelector('.lead-form__submit');
-
-    form.addEventListener('submit', function (event) {
-        event.preventDefault();
-
-        const sesionId = form.elements.sesion_id.value;
-        const archivo = form.elements.material.files[0];
-
-        if (!sesionId || !archivo) {
-            setStatus(statusEl, 'Selecciona una sesión y un archivo PDF.', 'error');
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('sesion_id', sesionId);
-        formData.append('material', archivo);
-
-        submitBtn.disabled = true;
-        setStatus(statusEl, 'Subiendo...', 'loading');
-
-        fetch('api/material_subir.php', {
-            method: 'POST',
-            credentials: 'same-origin',
-            body: formData
-        })
-            .then(function (response) {
-                return response.json().then(function (data) {
-                    return { ok: response.ok, data: data };
-                });
-            })
-            .then(function (result) {
-                if (result.ok && result.data.status === 'success') {
-                    setStatus(statusEl, result.data.message, 'success');
-                    form.reset();
-                } else {
-                    setStatus(statusEl, result.data.message || 'No pudimos subir el material.', 'error');
-                }
-            })
-            .catch(function () {
-                setStatus(statusEl, 'Error de conexión. Intenta de nuevo.', 'error');
-            })
-            .finally(function () {
                 submitBtn.disabled = false;
             });
     });
@@ -1368,6 +1351,13 @@ function initLeadCaptureModal() {
                 if (result.ok && result.data.status === 'success') {
                     setStatus(statusEl, result.data.message, 'success');
                     form.reset();
+                    // Marca de confirmación local (este navegador, sin cuenta
+                    // de usuario) — habilita la revelación condicional del
+                    // enlace/botón de acceso en vivo (club-lectura.php,
+                    // MODULO_03_CRM_EVENTOS_EN_VIVO §3.2).
+                    try {
+                        localStorage.setItem('clubLecturaConfirmado', '1');
+                    } catch (e) { /* almacenamiento no disponible — degrada sin romper el flujo */ }
                 } else {
                     setStatus(statusEl, result.data.message || 'No pudimos procesar tu registro.', 'error');
                 }
@@ -1415,4 +1405,293 @@ function initStagingTestInvitacion() {
                 btn.disabled = false;
             });
     });
+}
+
+/* ── CONTROLADOR CENTRAL DE USUARIOS (dashboard.php, super_admin) ─────────── */
+
+function initUsuariosControlTable() {
+    const statusEl = document.getElementById('usuarios-control-status');
+
+    document.querySelectorAll('[data-accion-usuario]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const accion = btn.dataset.accionUsuario;
+            const usuarioId = btn.dataset.usuarioId;
+            const fila = btn.closest('[data-usuario-row]');
+            const celdaAcciones = btn.closest('.dash-table__actions');
+
+            if (accion === 'resetear') {
+                if (!window.confirm('¿Resetear la contraseña de este usuario? Se invalidará su acceso actual y se le enviará un enlace por correo.')) {
+                    return;
+                }
+                ejecutarAccionUsuario('api/usuarios_resetear_password.php', usuarioId, statusEl);
+                return;
+            }
+
+            if (accion === 'suspender') {
+                if (!window.confirm('¿Suspender a este usuario? Su sesión activa se cerrará de inmediato.')) {
+                    return;
+                }
+                ejecutarAccionUsuario('api/usuarios_suspender.php', usuarioId, statusEl, function () {
+                    const badge = fila.querySelector('.dash-badge');
+                    if (badge) {
+                        badge.className = 'dash-badge dash-badge--suspendido';
+                        badge.textContent = 'suspendido';
+                    }
+                });
+                return;
+            }
+
+            if (accion === 'eliminar') {
+                // Confirmación visual EN LÍNEA — no un confirm() del navegador.
+                const htmlOriginal = celdaAcciones.innerHTML;
+                celdaAcciones.innerHTML =
+                    '<span class="dash-table__confirm-text">¿Eliminar definitivamente?</span> ' +
+                    '<button type="button" class="dash-table__action-btn dash-table__action-btn--confirmar" data-confirmar-eliminar>Sí, eliminar</button>' +
+                    '<button type="button" class="dash-table__action-btn" data-cancelar-eliminar>Cancelar</button>';
+
+                celdaAcciones.querySelector('[data-cancelar-eliminar]').addEventListener('click', function () {
+                    celdaAcciones.innerHTML = htmlOriginal;
+                    initUsuariosControlTable();
+                });
+
+                celdaAcciones.querySelector('[data-confirmar-eliminar]').addEventListener('click', function () {
+                    ejecutarAccionUsuario('api/usuarios_eliminar.php', usuarioId, statusEl, function () {
+                        fila.remove();
+                    });
+                });
+            }
+        });
+    });
+}
+
+function ejecutarAccionUsuario(endpoint, usuarioId, statusEl, alExito) {
+    setStatus(statusEl, 'Procesando...', 'loading');
+
+    fetch(endpoint, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario_id: parseInt(usuarioId, 10) })
+    })
+        .then(function (response) {
+            return response.json().then(function (data) {
+                return { ok: response.ok, data: data };
+            });
+        })
+        .then(function (result) {
+            if (result.ok && result.data.status === 'success') {
+                setStatus(statusEl, result.data.message, 'success');
+                if (typeof alExito === 'function') {
+                    alExito();
+                }
+            } else {
+                setStatus(statusEl, result.data.message || 'No pudimos completar la acción.', 'error');
+            }
+        })
+        .catch(function () {
+            setStatus(statusEl, 'Error de conexión. Intenta de nuevo.', 'error');
+        });
+}
+
+/* ── LEDGER PAGINADO DEL REGISTRO DE INGRESO (dashboard.php, super_admin) ─── */
+// Paginación server-side (15 por página), buscador y borrado selectivo/masivo
+// — evita que la tabla de auditoría crezca sin control y rompa el scroll
+// vertical del panel (Re-Ingeniería del Dashboard, Crowd Control).
+
+function initRegistroIngresoLedger() {
+    const tbody = document.getElementById('registro-ingreso-tbody');
+    if (!tbody) {
+        return;
+    }
+
+    const buscarInput = document.getElementById('registro-ingreso-buscar');
+    const paginacionEl = document.getElementById('registro-ingreso-paginacion');
+    const statusEl = document.getElementById('registro-ingreso-status');
+    const seleccionarTodosCheckbox = document.getElementById('registro-ingreso-seleccionar-todos');
+    const borrarSeleccionBtn = document.getElementById('registro-ingreso-borrar-seleccion');
+    const purgarBtns = document.querySelectorAll('[data-purgar-ingreso]');
+
+    let paginaActual = 1;
+    let busquedaActual = '';
+    let debounceTimer = null;
+
+    function actualizarBotonSeleccion() {
+        const marcados = tbody.querySelectorAll('[data-registro-checkbox]:checked');
+        borrarSeleccionBtn.disabled = marcados.length === 0;
+    }
+
+    function renderFilas(registros) {
+        tbody.innerHTML = '';
+
+        if (registros.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6">No se encontraron registros.</td></tr>';
+            return;
+        }
+
+        registros.forEach(function (registro) {
+            const tr = document.createElement('tr');
+
+            const tdCheckbox = document.createElement('td');
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.dataset.registroCheckbox = '';
+            checkbox.value = String(registro.id);
+            checkbox.setAttribute('aria-label', 'Seleccionar registro');
+            checkbox.addEventListener('change', actualizarBotonSeleccion);
+            tdCheckbox.appendChild(checkbox);
+
+            const tdNombre = document.createElement('td');
+            tdNombre.textContent = registro.nombre;
+            const tdEmail = document.createElement('td');
+            tdEmail.textContent = registro.email;
+            const tdIp = document.createElement('td');
+            tdIp.textContent = registro.ip;
+            const tdUbicacion = document.createElement('td');
+            tdUbicacion.textContent = registro.ubicacion;
+            const tdFecha = document.createElement('td');
+            tdFecha.textContent = registro.fecha;
+
+            tr.append(tdCheckbox, tdNombre, tdEmail, tdIp, tdUbicacion, tdFecha);
+            tbody.appendChild(tr);
+        });
+
+        seleccionarTodosCheckbox.checked = false;
+        actualizarBotonSeleccion();
+    }
+
+    function renderPaginacion(pagina, totalPaginas) {
+        paginacionEl.innerHTML = '';
+
+        const btnAnterior = document.createElement('button');
+        btnAnterior.type = 'button';
+        btnAnterior.className = 'dash-table__action-btn';
+        btnAnterior.textContent = '← Anterior';
+        btnAnterior.disabled = pagina <= 1;
+        btnAnterior.addEventListener('click', function () {
+            paginaActual = pagina - 1;
+            cargarPagina();
+        });
+
+        const info = document.createElement('span');
+        info.className = 'dash-pagination__info';
+        info.textContent = 'Página ' + pagina + ' de ' + totalPaginas;
+
+        const btnSiguiente = document.createElement('button');
+        btnSiguiente.type = 'button';
+        btnSiguiente.className = 'dash-table__action-btn';
+        btnSiguiente.textContent = 'Siguiente →';
+        btnSiguiente.disabled = pagina >= totalPaginas;
+        btnSiguiente.addEventListener('click', function () {
+            paginaActual = pagina + 1;
+            cargarPagina();
+        });
+
+        paginacionEl.append(btnAnterior, info, btnSiguiente);
+    }
+
+    function cargarPagina() {
+        tbody.innerHTML = '<tr><td colspan="6">Cargando…</td></tr>';
+
+        const params = new URLSearchParams({ pagina: String(paginaActual), buscar: busquedaActual });
+
+        fetch('api/registro_ingreso_listar.php?' + params.toString(), { credentials: 'same-origin' })
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    return { ok: response.ok, data: data };
+                });
+            })
+            .then(function (result) {
+                if (result.ok && result.data.status === 'success') {
+                    paginaActual = result.data.data.pagina;
+                    renderFilas(result.data.data.registros);
+                    renderPaginacion(result.data.data.pagina, result.data.data.total_paginas);
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="6">No pudimos cargar el registro de ingreso.</td></tr>';
+                }
+            })
+            .catch(function () {
+                tbody.innerHTML = '<tr><td colspan="6">Error de conexión.</td></tr>';
+            });
+    }
+
+    if (buscarInput) {
+        buscarInput.addEventListener('input', function () {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(function () {
+                busquedaActual = buscarInput.value.trim();
+                paginaActual = 1;
+                cargarPagina();
+            }, 350);
+        });
+    }
+
+    if (seleccionarTodosCheckbox) {
+        seleccionarTodosCheckbox.addEventListener('change', function () {
+            tbody.querySelectorAll('[data-registro-checkbox]').forEach(function (checkbox) {
+                checkbox.checked = seleccionarTodosCheckbox.checked;
+            });
+            actualizarBotonSeleccion();
+        });
+    }
+
+    function purgarRegistros(payload, confirmMessage) {
+        if (!window.confirm(confirmMessage)) {
+            return;
+        }
+
+        setStatus(statusEl, 'Eliminando...', 'loading');
+
+        fetch('api/registro_ingreso_eliminar.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    return { ok: response.ok, data: data };
+                });
+            })
+            .then(function (result) {
+                if (result.ok && result.data.status === 'success') {
+                    setStatus(statusEl, result.data.message, 'success');
+                    paginaActual = 1;
+                    cargarPagina();
+                } else {
+                    setStatus(statusEl, result.data.message || 'No pudimos eliminar los registros.', 'error');
+                }
+            })
+            .catch(function () {
+                setStatus(statusEl, 'Error de conexión. Intenta de nuevo.', 'error');
+            });
+    }
+
+    purgarBtns.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const modo = btn.dataset.purgarIngreso;
+
+            if (modo === 'todos') {
+                purgarRegistros({ modo: 'todos' }, '¿Eliminar TODO el historial de accesos? Esta acción no se puede deshacer.');
+            } else {
+                const cantidad = parseInt(modo, 10);
+                purgarRegistros({ modo: 'cantidad', cantidad: cantidad }, '¿Eliminar los ' + cantidad + ' registros más antiguos?');
+            }
+        });
+    });
+
+    if (borrarSeleccionBtn) {
+        borrarSeleccionBtn.addEventListener('click', function () {
+            const ids = Array.from(tbody.querySelectorAll('[data-registro-checkbox]:checked')).map(function (checkbox) {
+                return parseInt(checkbox.value, 10);
+            });
+
+            if (ids.length === 0) {
+                return;
+            }
+
+            purgarRegistros({ modo: 'seleccionados', ids: ids }, '¿Eliminar los ' + ids.length + ' registros seleccionados?');
+        });
+    }
+
+    cargarPagina();
 }

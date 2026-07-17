@@ -87,23 +87,17 @@ try {
     $correoEnviado = enviarCorreoTransaccional(
         $email,
         'Invitación al Dashboard — El Efecto Ajedrez',
-        '<p>Hola ' . htmlspecialchars($nombre, ENT_QUOTES, 'UTF-8') . ',</p>'
-        . '<p>Has sido invitado(a) al Dashboard de El Efecto Ajedrez. Define tu contraseña en el siguiente enlace (válido por ' . TTL_INVITACION_HORAS . ' horas):</p>'
-        . '<p><a href="' . htmlspecialchars($enlaceInvitacion, ENT_QUOTES, 'UTF-8') . '">Aceptar invitación</a></p>'
+        construirPlantillaInvitacion($nombre, $enlaceInvitacion, $email)
     );
 
     registrarActividad($pdo, (int) $actor['id'], 'usuario_invitado', 'Invitación enviada a: ' . $email . ($correoEnviado ? '' : ' (correo no confirmado)'));
 
-    $respuesta = ['correo_enviado' => $correoEnviado];
+    // El enlace de invitación NUNCA viaja en la respuesta HTTP — ni siquiera
+    // en local. Solo el log interno lo conserva, para depuración manual sin
+    // exponer configuración de entorno ni rutas al cliente (Capa 6).
+    error_log('[' . date('Y-m-d H:i:s') . '] usuarios_invitar.php: enlace generado para ' . $email . ': ' . $enlaceInvitacion . PHP_EOL, 3, __DIR__ . '/../logs/error.log');
 
-    // El enlace en claro solo se expone en la respuesta cuando el entorno es
-    // local — facilita pruebas en XAMPP sin depender del SMTP real. Nunca en
-    // producción (el enlace debe viajar únicamente por el correo).
-    if (($env['APP_ENV'] ?? '') === 'local') {
-        $respuesta['enlace_invitacion_local'] = $enlaceInvitacion;
-    }
-
-    jsonResponse('success', 'Invitación registrada.', $respuesta, 201);
+    jsonResponse('success', 'Invitación enviada de forma exitosa por correo.', ['correo_enviado' => $correoEnviado], 201);
 } catch (PDOException $e) {
     $pdo->rollBack();
 

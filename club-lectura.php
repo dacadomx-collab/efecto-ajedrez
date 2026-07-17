@@ -153,21 +153,26 @@ if (isset($_GET['modo_edicion']) && $_GET['modo_edicion'] === '1') {
                             <span class="club-details__label">Días</span>
                             <span class="club-details__value" data-block-id="detalle_dias" data-block-type="texto"><?php echo bloqueTexto($bloques, 'detalle_dias', 'Todos los martes y jueves'); ?></span>
                         </li>
-                        <li class="club-details__item">
-                            <span class="club-details__label">🇲🇽 México (CDMX)</span>
-                            <span class="club-details__value" data-block-id="detalle_horario_mx" data-block-type="texto"><?php echo bloqueTexto($bloques, 'detalle_horario_mx', '8:30 p.m. – 9:30 p.m.'); ?></span>
-                        </li>
-                        <li class="club-details__item">
-                            <span class="club-details__label">🇵🇪 Perú</span>
-                            <span class="club-details__value" data-block-id="detalle_horario_pe" data-block-type="texto"><?php echo bloqueTexto($bloques, 'detalle_horario_pe', '9:30 p.m. – 10:30 p.m.'); ?></span>
-                        </li>
-                        <li class="club-details__item">
-                            <span class="club-details__label">🇦🇷 Argentina</span>
-                            <span class="club-details__value" data-block-id="detalle_horario_ar" data-block-type="texto"><?php echo bloqueTexto($bloques, 'detalle_horario_ar', '11:30 p.m. – 12:30 a.m.'); ?></span>
-                        </li>
-                        <li class="club-details__item">
-                            <span class="club-details__label">Enlace/Link</span>
-                            <span class="club-details__value" data-block-id="detalle_enlace" data-block-type="texto"><?php echo bloqueTexto($bloques, 'detalle_enlace', 'Google Meet — el acceso aparece aquí 15 min antes'); ?></span>
+                        <li class="club-details__item club-schedule-card">
+                            <span class="club-details__label">Horarios por país</span>
+                            <ul class="club-schedule-card__list">
+                                <li class="club-schedule-card__row">
+                                    <span class="club-schedule-card__flag" aria-hidden="true">🇲🇽</span>
+                                    <span class="club-schedule-card__country">México (CDMX)</span>
+                                    <span class="club-schedule-card__time" data-block-id="detalle_horario_mx" data-block-type="texto"><?php echo bloqueTexto($bloques, 'detalle_horario_mx', '8:30 p.m.'); ?></span>
+                                </li>
+                                <li class="club-schedule-card__row">
+                                    <span class="club-schedule-card__flag" aria-hidden="true">🇵🇪</span>
+                                    <span class="club-schedule-card__country">Perú</span>
+                                    <span class="club-schedule-card__time" data-block-id="detalle_horario_pe" data-block-type="texto"><?php echo bloqueTexto($bloques, 'detalle_horario_pe', '9:30 p.m.'); ?></span>
+                                </li>
+                                <li class="club-schedule-card__row">
+                                    <span class="club-schedule-card__flag" aria-hidden="true">🇦🇷</span>
+                                    <span class="club-schedule-card__country">Argentina</span>
+                                    <span class="club-schedule-card__time" data-block-id="detalle_horario_ar" data-block-type="texto"><?php echo bloqueTexto($bloques, 'detalle_horario_ar', '11:30 p.m.'); ?></span>
+                                </li>
+                            </ul>
+                            <p class="club-schedule-card__note" data-block-id="detalle_enlace" data-block-type="texto"><?php echo bloqueTexto($bloques, 'detalle_enlace', 'Enlace/Link Google Meet — el acceso aparece aquí 15 min antes'); ?></p>
                         </li>
                     </ul>
                     <div id="club-access" class="club-access">
@@ -175,6 +180,8 @@ if (isset($_GET['modo_edicion']) && $_GET['modo_edicion'] === '1') {
                             <span class="live-block__dot" aria-hidden="true"></span>
                             Próxima sesión en vivo
                         </p>
+                        <p class="club-access__hint" id="club-access-hint">Regístrate para desbloquear tu acceso a la sesión en vivo.</p>
+                        <button type="button" id="club-access-enter-btn" class="btn btn--primary" hidden>Ingresar a la Sala de Check-In</button>
                     </div>
                 </div>
                 <div class="club-cta-wrap">
@@ -255,7 +262,7 @@ if (isset($_GET['modo_edicion']) && $_GET['modo_edicion'] === '1') {
                     <label class="lead-form__label" for="interesado-edad">Edad</label>
                     <input class="lead-form__input" type="number" id="interesado-edad" name="edad" min="1" max="120" step="1" required>
                 </div>
-                <p class="lead-form__microcopy">Se parte de este gran grupo.</p>
+                <p class="lead-form__microcopy">Tu ubicación se detecta automáticamente — no necesitas escribirla.</p>
                 <button type="submit" class="btn btn--primary lead-form__submit">Enviar</button>
                 <p id="registro-interesado-status" class="lead-form__status" role="status" aria-live="polite"></p>
             </form>

@@ -59,21 +59,33 @@ $geo = resolverGeoIp($ip);
 try {
     $pdo = (new Database())->getConnection();
 
-    $stmt = $pdo->prepare(
-        'INSERT INTO registro_interesados (nombre, email, edad, ciudad, estado, ip, ip_pais, ip_estado, ip_ciudad)
-         VALUES (:nombre, :email, :edad, :ciudad, :estado, :ip, :ip_pais, :ip_estado, :ip_ciudad)'
-    );
-    $stmt->execute([
-        ':nombre' => $nombre,
-        ':email' => $email,
-        ':edad' => $edad,
-        ':ciudad' => $geo['ciudad'],
-        ':estado' => $geo['estado'],
-        ':ip' => $ip,
-        ':ip_pais' => $geo['pais'],
-        ':ip_estado' => $geo['estado'],
-        ':ip_ciudad' => $geo['ciudad'],
-    ]);
+    // Validación inflexible de unicidad: una misma persona (mismo correo)
+    // nunca puede duplicarse en el ledger de interesados. La verificación se
+    // hace de forma silenciosa — la respuesta al cliente es idéntica exista
+    // o no el duplicado, mismo principio anti-enumeración que MODULO_01
+    // §2.2 (evita que un tercero use este endpoint para confirmar si un
+    // correo específico ya está registrado).
+    $stmt = $pdo->prepare('SELECT id FROM registro_interesados WHERE email = :email LIMIT 1');
+    $stmt->execute([':email' => $email]);
+    $yaRegistrado = $stmt->fetch() !== false;
+
+    if (!$yaRegistrado) {
+        $stmt = $pdo->prepare(
+            'INSERT INTO registro_interesados (nombre, email, edad, ciudad, estado, ip, ip_pais, ip_estado, ip_ciudad)
+             VALUES (:nombre, :email, :edad, :ciudad, :estado, :ip, :ip_pais, :ip_estado, :ip_ciudad)'
+        );
+        $stmt->execute([
+            ':nombre' => $nombre,
+            ':email' => $email,
+            ':edad' => $edad,
+            ':ciudad' => $geo['ciudad'],
+            ':estado' => $geo['estado'],
+            ':ip' => $ip,
+            ':ip_pais' => $geo['pais'],
+            ':ip_estado' => $geo['estado'],
+            ':ip_ciudad' => $geo['ciudad'],
+        ]);
+    }
 
     jsonResponse('success', '¡Listo! Te avisaremos por correo cuando esté por comenzar la próxima sesión.', [], 201);
 } catch (PDOException $e) {

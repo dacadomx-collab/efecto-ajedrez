@@ -47,24 +47,23 @@ $verSeguridad = $esSuperAdmin || esModuloVisible($pdo, 'seguridad', (string) $us
 $verLanding = $esSuperAdmin || esModuloVisible($pdo, 'landing', (string) $usuarioActual['rol']);
 $verInvitados = $esSuperAdmin || esModuloVisible($pdo, 'invitados', (string) $usuarioActual['rol']);
 
-$registroIngreso = [];
+$todosLosUsuarios = [];
 if ($esSuperAdmin) {
     try {
-        $registroIngreso = $pdo->query(
-            'SELECT la.evento, la.ip, la.ip_pais, la.ip_estado, la.ip_ciudad, la.created_at, u.nombre, u.email
-             FROM log_actividad la
-             LEFT JOIN usuarios u ON u.id = la.usuario_id
-             WHERE la.evento = \'login_exitoso\'
-             ORDER BY la.created_at DESC
-             LIMIT 50'
+        $todosLosUsuarios = $pdo->query(
+            'SELECT id, nombre, email, rol, estatus FROM usuarios ORDER BY nombre'
         )->fetchAll();
     } catch (PDOException $e) {
-        error_log('[' . date('Y-m-d H:i:s') . '] dashboard.php registro_ingreso: ' . $e->getMessage() . PHP_EOL, 3, __DIR__ . '/logs/error.log');
+        error_log('[' . date('Y-m-d H:i:s') . '] dashboard.php usuarios: ' . $e->getMessage() . PHP_EOL, 3, __DIR__ . '/logs/error.log');
     }
 }
+// El Registro de Ingreso ya no se pre-renderiza server-side — el widget de
+// paginación/búsqueda/borrado masivo (Sección "Reestructuración Dashboard")
+// lo carga vía api/registro_ingreso_listar.php.
 
 $interesados = [];
 $sesiones = [];
+$totalUsuariosSistema = 0;
 if ($verInvitados) {
     try {
         $interesados = $pdo->query(
@@ -82,10 +81,19 @@ if ($verInvitados) {
              ORDER BY hs.fecha_hora DESC
              LIMIT 10'
         )->fetchAll();
+
+        // Métrica de la tarjeta KPI "Total de usuarios" (Sección B) — un
+        // conteo simple, no expone datos sensibles, seguro para cualquier
+        // rol que ya tenga visibilidad del módulo "invitados".
+        $totalUsuariosSistema = (int) $pdo->query('SELECT COUNT(*) FROM usuarios')->fetchColumn();
     } catch (PDOException $e) {
         error_log('[' . date('Y-m-d H:i:s') . '] dashboard.php invitados: ' . $e->getMessage() . PHP_EOL, 3, __DIR__ . '/logs/error.log');
     }
 }
+
+// Sesión "activa" del Círculo de Lectura para las tarjetas KPI de la
+// Sección B — la más reciente compartida (misma consulta ya ordenada DESC).
+$sesionActiva = $sesiones[0] ?? null;
 
 if ($esSuperAdmin || $verSeguridad) {
     try {
@@ -256,35 +264,67 @@ $rolesAsignables = $esSuperAdmin ? ['admin', 'super_admin'] : ['admin'];
                     </div>
 
                     <?php if ($esSuperAdmin): ?>
-                    <h3 class="auth-page__title dash-panel__subtitle">Staging de Correo</h3>
-                    <p class="dash-panel__hint">Envía la plantilla real de invitación al correo de auditoría, sin crear ningún usuario.</p>
-                    <button type="button" id="btn-staging-test-invitacion" class="btn btn--primary">Enviar Correo de Prueba a Staging</button>
-                    <p id="staging-test-invitacion-status" class="lead-form__status" role="status" aria-live="polite"></p>
-
-                    <h3 class="auth-page__title dash-panel__subtitle">Registro de Ingreso</h3>
-                    <p class="dash-panel__hint">Auditoría de accesos exitosos al Dashboard — quién, cuándo, desde dónde.</p>
+                    <h3 class="auth-page__title dash-panel__subtitle">Controlador Central de Usuarios</h3>
+                    <p class="dash-panel__hint">Resetear contraseña, suspender o eliminar cualquier cuenta del sistema.</p>
                     <div class="dash-table-wrap">
                         <table class="dash-table">
                             <thead>
-                                <tr><th>Usuario</th><th>Correo</th><th>IP</th><th>Ubicación</th><th>Fecha y hora</th></tr>
+                                <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estatus</th><th>Acciones</th></tr>
                             </thead>
                             <tbody>
-                                <?php if (empty($registroIngreso)): ?>
-                                    <tr><td colspan="5">Aún no hay ingresos registrados.</td></tr>
+                                <?php if (empty($todosLosUsuarios)): ?>
+                                    <tr><td colspan="5">No hay usuarios registrados.</td></tr>
                                 <?php else: ?>
-                                    <?php foreach ($registroIngreso as $ingreso): ?>
-                                    <tr>
-                                        <td><?php echo htmlspecialchars((string) ($ingreso['nombre'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></td>
-                                        <td><?php echo htmlspecialchars((string) ($ingreso['email'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></td>
-                                        <td><?php echo htmlspecialchars((string) ($ingreso['ip'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></td>
-                                        <td><?php echo htmlspecialchars(implode(', ', array_filter([$ingreso['ip_ciudad'], $ingreso['ip_estado'], $ingreso['ip_pais']])) ?: '—', ENT_QUOTES, 'UTF-8'); ?></td>
-                                        <td><?php echo htmlspecialchars((string) $ingreso['created_at'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                    <?php foreach ($todosLosUsuarios as $u): ?>
+                                    <tr data-usuario-row data-usuario-id="<?php echo (int) $u['id']; ?>">
+                                        <td><?php echo htmlspecialchars($u['nombre'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td><?php echo htmlspecialchars($u['email'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td><?php echo htmlspecialchars($u['rol'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td><span class="dash-badge dash-badge--<?php echo htmlspecialchars($u['estatus'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($u['estatus'], ENT_QUOTES, 'UTF-8'); ?></span></td>
+                                        <td class="dash-table__actions">
+                                            <button type="button" class="dash-table__action-btn" data-accion-usuario="resetear" data-usuario-id="<?php echo (int) $u['id']; ?>">Resetear contraseña</button>
+                                            <button type="button" class="dash-table__action-btn" data-accion-usuario="suspender" data-usuario-id="<?php echo (int) $u['id']; ?>">Suspender</button>
+                                            <button type="button" class="dash-table__action-btn dash-table__action-btn--peligro" data-accion-usuario="eliminar" data-usuario-id="<?php echo (int) $u['id']; ?>">Eliminar</button>
+                                        </td>
                                     </tr>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
+                    <p id="usuarios-control-status" class="lead-form__status" role="status" aria-live="polite"></p>
+
+                    <h3 class="auth-page__title dash-panel__subtitle">Staging de Correo</h3>
+                    <p class="dash-panel__hint">Envía la plantilla real de invitación al correo de auditoría, sin crear ningún usuario.</p>
+                    <button type="button" id="btn-staging-test-invitacion" class="btn btn--primary">Enviar Correo de Prueba a Staging</button>
+                    <p id="staging-test-invitacion-status" class="lead-form__status" role="status" aria-live="polite"></p>
+
+                    <h3 class="auth-page__title dash-panel__subtitle">Registro de Ingreso</h3>
+                    <p class="dash-panel__hint">Auditoría de accesos exitosos al Dashboard — quién, cuándo, desde dónde. Muestra 15 registros a la vez.</p>
+                    <div class="dash-ledger-toolbar">
+                        <input type="search" id="registro-ingreso-buscar" class="lead-form__input dash-ledger-toolbar__search" placeholder="Buscar por usuario o ubicación...">
+                        <div class="dash-ledger-toolbar__bulk">
+                            <button type="button" class="dash-table__action-btn" data-purgar-ingreso="10">Borrar 10 antiguos</button>
+                            <button type="button" class="dash-table__action-btn" data-purgar-ingreso="15">Borrar 15 antiguos</button>
+                            <button type="button" class="dash-table__action-btn dash-table__action-btn--peligro" data-purgar-ingreso="todos">Borrar todos</button>
+                            <button type="button" class="dash-table__action-btn dash-table__action-btn--peligro" id="registro-ingreso-borrar-seleccion" disabled>Borrar seleccionados</button>
+                        </div>
+                    </div>
+                    <div class="dash-table-wrap">
+                        <table class="dash-table">
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox" id="registro-ingreso-seleccionar-todos" aria-label="Seleccionar todos los registros visibles"></th>
+                                    <th>Usuario</th><th>Correo</th><th>IP</th><th>Ubicación</th><th>Fecha y hora</th>
+                                </tr>
+                            </thead>
+                            <tbody id="registro-ingreso-tbody">
+                                <tr><td colspan="6">Cargando…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="dash-pagination" id="registro-ingreso-paginacion"></div>
+                    <p id="registro-ingreso-status" class="lead-form__status" role="status" aria-live="polite"></p>
                     <?php endif; ?>
                 </section>
                 <?php endif; ?>
@@ -300,45 +340,60 @@ $rolesAsignables = $esSuperAdmin ? ['admin', 'super_admin'] : ['admin'];
                 <?php if ($verInvitados): ?>
                 <section id="invitados" class="dash-panel" hidden>
                     <h2 class="dash-panel__title">Invitados Confirmados</h2>
-                    <p class="dash-panel__intro">Comparte el enlace de la próxima sesión: se actualiza la Landing Page pública y se notifica por correo a todos los interesados registrados.</p>
 
-                    <form id="sesion-compartir-form" class="lead-form" novalidate>
-                        <div class="lead-form__field">
-                            <label class="lead-form__label" for="sesion-enlace">Enlace de Google Meet / Zoom</label>
-                            <input class="lead-form__input" type="url" id="sesion-enlace" name="enlace" placeholder="https://meet.google.com/xxx-xxxx-xxx" required>
-                        </div>
-                        <div class="lead-form__field">
-                            <label class="lead-form__label" for="sesion-fecha">Fecha y hora programada</label>
-                            <input class="lead-form__input" type="datetime-local" id="sesion-fecha" name="fecha_hora">
-                        </div>
-                        <div class="lead-form__field">
-                            <label class="lead-form__label" for="sesion-tema">Libro o tema de la sesión (opcional)</label>
-                            <input class="lead-form__input" type="text" id="sesion-tema" name="tema">
-                        </div>
-                        <button type="submit" class="btn btn--primary lead-form__submit">Compartir</button>
-                        <p id="sesion-compartir-status" class="lead-form__status" role="status" aria-live="polite"></p>
-                    </form>
+                    <!-- SECCIÓN A — Planeador Live: la acción más usada del día a día,
+                         siempre lo primero que ve el operador al entrar a este panel. -->
+                    <div class="dash-widget dash-widget--planeador">
+                        <h3 class="dash-widget__title">🚀 Planeador de la Próxima Sesión</h3>
+                        <p class="dash-panel__hint">Un solo lugar para preparar la próxima sesión: enlace, fecha, material y mensaje — se notifica por correo a todos los interesados registrados al presionar "Compartir".</p>
+                        <form id="planeador-live-form" class="lead-form" novalidate>
+                            <div class="lead-form__field">
+                                <label class="lead-form__label" for="sesion-enlace">Enlace de Google Meet / Zoom</label>
+                                <input class="lead-form__input" type="url" id="sesion-enlace" name="enlace" placeholder="https://meet.google.com/xxx-xxxx-xxx" required>
+                            </div>
+                            <div class="lead-form__field">
+                                <label class="lead-form__label" for="sesion-fecha">Fecha y hora programada</label>
+                                <input class="lead-form__input" type="datetime-local" id="sesion-fecha" name="fecha_hora">
+                            </div>
+                            <div class="lead-form__field">
+                                <label class="lead-form__label" for="sesion-tema">Tema del libro / Mensaje rápido (opcional)</label>
+                                <input class="lead-form__input" type="text" id="sesion-tema" name="tema" placeholder="Título del libro o tema de la sesión">
+                            </div>
+                            <div class="lead-form__field">
+                                <label class="lead-form__label" for="sesion-mensaje">Mensaje personalizado para el correo (opcional)</label>
+                                <textarea class="lead-form__input" id="sesion-mensaje" name="mensaje" rows="3" maxlength="500" placeholder="Unas palabras para tus lectores antes de la sesión..."></textarea>
+                            </div>
+                            <div class="lead-form__field">
+                                <label class="lead-form__label" for="sesion-archivo">Libro del club (PDF, opcional, máx. 20MB)</label>
+                                <input class="lead-form__input" type="file" id="sesion-archivo" name="material" accept="application/pdf">
+                            </div>
+                            <button type="submit" class="btn btn--primary lead-form__submit">Compartir</button>
+                            <p id="planeador-live-status" class="lead-form__status" role="status" aria-live="polite"></p>
+                        </form>
+                    </div>
 
-                    <h3 class="auth-page__title dash-panel__subtitle">Material de lectura (PDF)</h3>
-                    <p class="dash-panel__hint">Solo podrán descargarlo los asistentes que confirmen su check-in real en la sesión — el interés inicial no es suficiente.</p>
-                    <form id="material-subir-form" class="lead-form" novalidate>
-                        <div class="lead-form__field">
-                            <label class="lead-form__label" for="material-sesion-id">Sesión</label>
-                            <select class="lead-form__input" id="material-sesion-id" name="sesion_id" required>
-                                <option value="">Selecciona una sesión</option>
-                                <?php foreach ($sesiones as $sesion): ?>
-                                    <option value="<?php echo (int) $sesion['id']; ?>"><?php echo htmlspecialchars((string) $sesion['fecha_hora'], ENT_QUOTES, 'UTF-8'); ?> — <?php echo htmlspecialchars((string) ($sesion['tema'] ?? 'Sin tema'), ENT_QUOTES, 'UTF-8'); ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                    <!-- SECCIÓN B — Métricas activas en tarjetas (KPIs de un vistazo). -->
+                    <h3 class="auth-page__title dash-panel__subtitle">De un vistazo</h3>
+                    <div class="dash-panel__grid dash-kpi-grid">
+                        <div class="arf-grid__item dash-kpi-card">
+                            <span class="dash-kpi-card__label">Fecha programada</span>
+                            <span class="dash-kpi-card__value"><?php echo $sesionActiva !== null ? htmlspecialchars((string) $sesionActiva['fecha_hora'], ENT_QUOTES, 'UTF-8') : 'Sin sesión activa'; ?></span>
                         </div>
-                        <div class="lead-form__field">
-                            <label class="lead-form__label" for="material-archivo">Archivo PDF (máx. 20MB)</label>
-                            <input class="lead-form__input" type="file" id="material-archivo" name="material" accept="application/pdf" required>
+                        <div class="arf-grid__item dash-kpi-card">
+                            <span class="dash-kpi-card__label">Libro activo</span>
+                            <span class="dash-kpi-card__value"><?php echo $sesionActiva !== null ? htmlspecialchars((string) ($sesionActiva['tema'] ?? 'Sin tema'), ENT_QUOTES, 'UTF-8') : '—'; ?></span>
                         </div>
-                        <button type="submit" class="btn btn--primary lead-form__submit">Subir material</button>
-                        <p id="material-subir-status" class="lead-form__status" role="status" aria-live="polite"></p>
-                    </form>
+                        <div class="arf-grid__item dash-kpi-card">
+                            <span class="dash-kpi-card__label">Participantes confirmados</span>
+                            <span class="dash-kpi-card__value"><?php echo count($interesados); ?></span>
+                        </div>
+                        <div class="arf-grid__item dash-kpi-card">
+                            <span class="dash-kpi-card__label">Total de usuarios del sistema</span>
+                            <span class="dash-kpi-card__value"><?php echo $totalUsuariosSistema; ?></span>
+                        </div>
+                    </div>
 
+                    <!-- SECCIÓN C — Historial de sesiones (ledger compacto, al final). -->
                     <h3 class="auth-page__title dash-panel__subtitle">Historial de sesiones</h3>
                     <div class="dash-table-wrap">
                         <table class="dash-table">
@@ -363,14 +418,15 @@ $rolesAsignables = $esSuperAdmin ? ['admin', 'super_admin'] : ['admin'];
                     </div>
 
                     <h3 class="auth-page__title dash-panel__subtitle">Interesados registrados (<?php echo count($interesados); ?>)</h3>
+                    <p class="dash-panel__hint">IP y ubicación se conservan en la base de datos para auditoría interna — no se muestran aquí para aligerar la tabla en pantallas pequeñas.</p>
                     <div class="dash-table-wrap">
                         <table class="dash-table">
                             <thead>
-                                <tr><th>Nombre</th><th>Correo</th><th>Edad</th><th>Ciudad</th><th>Estado</th><th>IP</th><th>Ubicación (IP)</th><th>Registrado</th></tr>
+                                <tr><th>Nombre</th><th>Correo</th><th>Edad</th><th>Ciudad</th><th>Estado</th><th>Registrado</th></tr>
                             </thead>
                             <tbody>
                                 <?php if (empty($interesados)): ?>
-                                    <tr><td colspan="8">Aún no hay interesados registrados.</td></tr>
+                                    <tr><td colspan="6">Aún no hay interesados registrados.</td></tr>
                                 <?php else: ?>
                                     <?php foreach ($interesados as $persona): ?>
                                     <tr>
@@ -379,8 +435,6 @@ $rolesAsignables = $esSuperAdmin ? ['admin', 'super_admin'] : ['admin'];
                                         <td><?php echo htmlspecialchars((string) $persona['edad'], ENT_QUOTES, 'UTF-8'); ?></td>
                                         <td><?php echo htmlspecialchars((string) ($persona['ciudad'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></td>
                                         <td><?php echo htmlspecialchars((string) ($persona['estado'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></td>
-                                        <td><?php echo htmlspecialchars($persona['ip'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                        <td><?php echo htmlspecialchars(implode(', ', array_filter([$persona['ip_ciudad'], $persona['ip_estado'], $persona['ip_pais']])) ?: '—', ENT_QUOTES, 'UTF-8'); ?></td>
                                         <td><?php echo htmlspecialchars((string) $persona['created_at'], ENT_QUOTES, 'UTF-8'); ?></td>
                                     </tr>
                                     <?php endforeach; ?>

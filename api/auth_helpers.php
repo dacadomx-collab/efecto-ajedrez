@@ -7,6 +7,42 @@ declare(strict_types=1);
 // invitacion_confirmar). Se centraliza aquí para evitar declarar la misma
 // función en 6 endpoints distintos que se necesitan entre sí.
 
+// Ancla la zona horaria de PHP para todo el proyecto — sin esto, PHP hereda
+// el timezone del sistema operativo del servidor (en el entorno local de
+// esta sesión, "Europe/Berlin", confirmado comparando date() de PHP contra
+// NOW() de MySQL). Esa herencia implícita es un bug latente real: afecta
+// cualquier cálculo de fecha/hora de negocio (ej. "próxima sesión martes/
+// jueves 8:30pm" del CRM) sin que nadie lo note hasta que el servidor migre
+// de host. MySQL almacena en UTC (su timezone SYSTEM, verificado); PHP fija
+// aquí su propio default a la zona horaria de referencia del proyecto
+// (México, audiencia principal) — la única fuente de verdad para lógica de
+// negocio, independiente del sistema operativo donde corra el proceso.
+date_default_timezone_set('America/Mexico_City');
+
+/**
+ * Formatea un timestamp almacenado en UTC (MySQL) a la zona horaria de
+ * La Paz, Baja California Sur — "Registro de Ingreso" del Dashboard.
+ * Meses abreviados en español (no hay garantía de ext-intl disponible en
+ * todos los hosts, de ahí el mapeo manual en vez de IntlDateFormatter).
+ */
+function formatearFechaMazatlan(string $fechaUtc): string
+{
+    static $mesesAbrev = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+    try {
+        $dt = new DateTimeImmutable($fechaUtc, new DateTimeZone('UTC'));
+        $dt = $dt->setTimezone(new DateTimeZone('America/Mazatlan'));
+    } catch (Exception $e) {
+        return $fechaUtc;
+    }
+
+    $mes = $mesesAbrev[((int) $dt->format('n')) - 1];
+
+    // Formato "Jul 16, 2026, 09:31 pm" — mes abreviado en español, día y
+    // hora siempre a 2 dígitos (padding), am/pm en minúsculas.
+    return $mes . ' ' . $dt->format('d') . ', ' . $dt->format('Y') . ', ' . $dt->format('h:i') . ' ' . $dt->format('a');
+}
+
 function jsonResponse(string $status, string $message, array $data = [], int $httpCode = 200): never
 {
     http_response_code($httpCode);

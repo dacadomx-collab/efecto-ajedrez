@@ -59,3 +59,33 @@ Es el origen de `git clone` / copia para cada nuevo desarrollo de DCD LABS.
 - Mandamientos y protocolos: [`knowledge/01_LEY_Y_PROTOCOLOS_DE_VUELO.md`](knowledge/01_LEY_Y_PROTOCOLOS_DE_VUELO.md)
 - Codex y schema maestro: [`knowledge/02_CODEX_Y_SCHEMA_MAESTRO.md`](knowledge/02_CODEX_Y_SCHEMA_MAESTRO.md)
 - Contratos de API: [`knowledge/03_CONTRATOS_API_Y_RUTAS.md`](knowledge/03_CONTRATOS_API_Y_RUTAS.md)
+
+## 6. BLUEPRINTS GENÉRICOS REUTILIZABLES (`modulos/`)
+
+Además de los 4 capas inmutables (Sección 1), el holding acumula blueprints de arquitectura por dominio funcional, derivados de proyectos reales pero purgados a `{{PROJECT_NAME}}` genérico — listos para consultar o clonar en el siguiente proyecto sin repetir el diseño desde cero:
+
+- [`modulos/MODULO_01_LOGIN_Y_ACCESO.md`](modulos/MODULO_01_LOGIN_Y_ACCESO.md) — autenticación por token opaco, RBAC dinámico, Dashboard mobile-first (acordeón + conmutador de paneles + jerarquía de widgets Acción→Estado→Historial), contrato de respuesta limpio, entregabilidad anti-SPAM universal, ledgers de auditoría paginados.
+- [`modulos/MODULO_02_CMS_EDICION_VISUAL.md`](modulos/MODULO_02_CMS_EDICION_VISUAL.md) — motor de edición visual inline sobre páginas públicas.
+- [`modulos/MODULO_03_CRM_EVENTOS_EN_VIVO.md`](modulos/MODULO_03_CRM_EVENTOS_EN_VIVO.md) — captación pública de interesados con unicidad de correo, orquestación de sesiones en vivo (planeador unificado), Sala de Check-In, husos horarios consolidados en un solo componente.
+
+Estos documentos son **agnósticos** (Ley Suprema de este archivo) — al clonar, sustituir sus marcadores igual que los de este índice maestro.
+
+## 7. LIBERACIÓN DE `knowledge/` PARA MANTENIMIENTO VIVO (2026-07-16)
+
+La restricción original que bloqueaba por completo la lectura/edición de la carpeta `knowledge/` quedó acotada exclusivamente al archivo humano confidencial `knowledge/info.txt` — los pilares `00`-`07` vuelven a ser mantenibles por el agente como Documentación Viva (Mandamiento 17), que es su propósito original. El bloqueo HTTP vía `.htaccess` (nadie accede a `knowledge/` desde el navegador) y la exclusión de Git (`.gitignore`) se mantienen intactos — esto es exclusivamente sobre permisos de lectura/edición del agente en el filesystem local.
+
+## 8. ESTADO VERIFICADO — HITO DE ACCESOS Y EVENTOS EN VIVO (2026-07-16)
+
+Sincronización confirmada entre `modulos/` (blueprints agnósticos) y `knowledge/` (pilares canónicos del proyecto real) para el hito de Login/Dashboard/RBAC y CRM de Eventos en Vivo:
+
+| Pieza | Verificado en código real | Registrado en `knowledge/` |
+| :--- | :---: | :---: |
+| Registro de Ingreso — exclusivo `super_admin` (UI oculta + backend `403`) | ✅ | ✅ `03_CONTRATOS_API_Y_RUTAS.md` |
+| `api/registro_ingreso_listar.php` / `api/registro_ingreso_eliminar.php` | ✅ | ✅ `03_CONTRATOS_API_Y_RUTAS.md` |
+| `api/sesiones_compartir.php` — Planeador Live unificado (`multipart/form-data`) | ✅ | ✅ `02_CODEX_Y_SCHEMA_MAESTRO.md`, `03_CONTRATOS_API_Y_RUTAS.md` |
+| `api/registro_interesado.php` — unicidad de correo silenciosa | ✅ | ✅ `03_CONTRATOS_API_Y_RUTAS.md` |
+| `api/email_helper.php` — dinamización nombre+correo, escala tipográfica, footer sin placeholder | ✅ | ✅ `02_CODEX_Y_SCHEMA_MAESTRO.md`, `03_CONTRATOS_API_Y_RUTAS.md` |
+| Dashboard — jerarquía Planeador Live → KPIs → Historial | ✅ | ✅ `07_UI_MODULOS_Y_PANTALLAS.md` |
+| `formatearFechaMazatlan()` — formato "Jul 16, 2026, 08:31 pm" (mes-día-año, 2 dígitos, am/pm minúsculas) | ✅ | ✅ `02_CODEX_Y_SCHEMA_MAESTRO.md` |
+| Footer anti-SPAM — "La Paz, Baja California Sur, México" confirmado por el Arquitecto | ✅ | ✅ `02_CODEX_Y_SCHEMA_MAESTRO.md` |
+| Backfill histórico completo (schema/contratos previos a la liberación de `knowledge/`) | — | ⬜ Pendiente, tarea dedicada aparte (ver nota de alcance en `02_CODEX_Y_SCHEMA_MAESTRO.md` y `03_CONTRATOS_API_Y_RUTAS.md`) |
