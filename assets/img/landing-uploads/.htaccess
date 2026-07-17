@@ -1,0 +1,17 @@
+# Directorio de subidas del Motor de Edición Visual (MODULO_02_CMS_EDICION_VISUAL).
+# Defensa en profundidad: aunque un archivo lograra pasar la validación de
+# MIME-type del backend, este directorio nunca ejecuta scripts — solo sirve
+# los archivos como recursos estáticos.
+# NOTA: este .htaccess es nuevo y local a esta carpeta — no modifica el
+# .htaccess raíz del proyecto (protegido, requiere autorización aparte).
+
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+
+<FilesMatch "\.(php|php\d|phtml|pl|py|cgi|sh)$">
+    Require all denied
+</FilesMatch>
+
+Options -ExecCGI
+AddHandler cgi-script .php .php3 .php4 .php5 .php7 .phtml .pl .py .cgi

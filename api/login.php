@@ -25,6 +25,7 @@ $payload = json_decode((string) $raw, true);
 
 $email = isset($payload['email']) ? trim(strip_tags((string) $payload['email'])) : '';
 $password = isset($payload['password']) ? (string) $payload['password'] : '';
+$recordarme = isset($payload['recordarme']) && $payload['recordarme'] === true;
 
 if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false || $password === '') {
     jsonResponse('error', 'Credenciales inválidas.', [], 422);
@@ -89,8 +90,15 @@ try {
     }
 
     // Éxito — token opaco de 256 bits + device binding
+    // "Mantenerme registrado" (MODULO_01_LOGIN_Y_ACCESO §3.5): extiende el TTL
+    // según la duración activa en configuracion_seguridad, sin relajar ninguna
+    // otra bandera de la cookie (HttpOnly/SameSite/Secure siguen aplicando).
+    $ttlSegundos = $recordarme
+        ? obtenerDuracionRecordarme($pdo) * 24 * 60 * 60
+        : TTL_TOKEN_SEGUNDOS;
+
     $token = bin2hex(random_bytes(32));
-    $tokenExpiraEn = (new DateTimeImmutable())->modify('+' . TTL_TOKEN_SEGUNDOS . ' seconds')->format('Y-m-d H:i:s');
+    $tokenExpiraEn = (new DateTimeImmutable())->modify('+' . $ttlSegundos . ' seconds')->format('Y-m-d H:i:s');
     $deviceHash = calcularDeviceHash();
 
     $stmt = $pdo->prepare(
@@ -106,8 +114,12 @@ try {
         ':id' => $usuario['id'],
     ]);
 
-    session_regenerate_id(true);
-    setCookieToken($token, TTL_TOKEN_SEGUNDOS);
+    // Nota: este proyecto no usa sesiones nativas de PHP ($_SESSION) — el
+    // equivalente a "regenerar el session ID" ya ocurre arriba emitiendo un
+    // token opaco nuevo (random_bytes) en cada login, que es lo que
+    // realmente previene session fixation en esta arquitectura.
+    setCookieToken($token, $ttlSegundos);
+    setCookiePerfil($usuario, $ttlSegundos);
 
     registrarActividad($pdo, (int) $usuario['id'], 'login_exitoso');
 

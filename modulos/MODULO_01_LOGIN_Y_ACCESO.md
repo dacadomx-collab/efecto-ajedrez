@@ -1,10 +1,12 @@
 # MODULO_01_LOGIN_Y_ACCESO — Ley Suprema de Autenticación
 
-**Clasificación:** Módulo Genérico de Arquitectura y Diseño Técnico | **Versión:** 3.0 (Blindaje Perimetral + Fricción Cero)
+**Clasificación:** Módulo Genérico de Arquitectura y Diseño Técnico | **Versión:** 6.0 (+ Navegación Global, RBAC Dinámico por Módulo, Núcleo Cognitivo de Bienvenida)
 **Alcance:** Documento agnóstico, reutilizable por cualquier proyecto de `{{HOLDING_NAME}}`. Ningún nombre de proyecto, cliente o dominio real debe aparecer aquí — sustituir siempre por `{{PROJECT_NAME}}`, `{{TABLE_PREFIX}}`, etc.
-**Relación con v2.0:** Este documento es el **blueprint técnico ejecutable** (SQL → PHP → Frontend). La v2.0 (To-Do list + checklist de madurez enterprise) permanece como anexo de gobernanza al final de este archivo — úsala para auditar qué tan lejos del "ideal enterprise" está la implementación concreta que este v3.0 describe.
+**Relación con v2.0:** Este documento es el **blueprint técnico ejecutable** (SQL → PHP → Frontend). La v2.0 (To-Do list + checklist de madurez enterprise) permanece como anexo de gobernanza al final de este archivo — úsala para auditar qué tan lejos del "ideal enterprise" está la implementación concreta que este v4.0 describe.
 
 > ⚠️ **Mandamiento de Secuencia SQL→PHP:** ningún endpoint de este módulo se escribe en un proyecto consumidor sin que el Schema Maestro (Sección 1) exista primero, palabra por palabra, como script `.sql` versionado en `/database` de ese proyecto. Ningún nombre de columna se traduce libremente — el Codex del proyecto consumidor es la única fuente de verdad para el mapeo final `{{PLACEHOLDER}}` → nombre real.
+
+> 📎 **Módulos relacionados:** [`MODULO_02_CMS_EDICION_VISUAL.md`](MODULO_02_CMS_EDICION_VISUAL.md) (Motor de Edición Visual en Caliente) y [`MODULO_03_CRM_EVENTOS_EN_VIVO.md`](MODULO_03_CRM_EVENTOS_EN_VIVO.md) (Captación de Interesados y Orquestación de Sesiones en Vivo) dependen de la sesión, roles y Mapeo Dinámico de Permisos definidos aquí (§3, §6, §6.1) — viven en archivos propios porque resuelven problemas distintos al de autenticación.
 
 ---
 
@@ -83,6 +85,28 @@ DELIMITER ;
 - Los triggers convierten el "append-only" en una garantía de motor de base de datos, no en una promesa de la capa PHP — ni siquiera una cuenta con privilegios elevados comprometida puede alterar el historial sin `DROP TRIGGER` explícito (evento auditable aparte).
 - `ip_hash`/`device_hash` nunca se loguean en claro — se calculan igual que `device_hash` en `usuarios` (Sección 3.3), permitiendo correlación sin exponer PII directamente en la bitácora.
 - La purga/archivado de bitácora antigua (retención) es una decisión de producto del proyecto consumidor — no se automatiza aquí sin autorización explícita.
+
+### 1.3 Tabla `{{TABLE_PREFIX}}configuracion_seguridad` (Política de Contraseña — fila única)
+
+```sql
+CREATE TABLE `{{TABLE_PREFIX}}configuracion_seguridad` (
+    `id`                        TINYINT UNSIGNED NOT NULL DEFAULT 1,
+    `politica_password`         ENUM('simple','media','fuerte') NOT NULL DEFAULT 'media',
+    `duracion_recordarme_dias`  SMALLINT UNSIGNED NOT NULL DEFAULT 60 COMMENT 'Canónico: 60 (2 meses) o 120 (4 meses) — Sección 3.5/7.5',
+    `actualizado_en`            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `{{TABLE_PREFIX}}configuracion_seguridad` (`id`, `politica_password`, `duracion_recordarme_dias`)
+VALUES (1, '{{POLITICA_PASSWORD_DEFAULT}}', {{DURACION_RECORDARME_DEFAULT}})
+ON DUPLICATE KEY UPDATE `id` = `id`;
+```
+
+**Notas de diseño:**
+- Fila única (`id = 1` siempre) — no es una tabla de historial, es la configuración activa. Ver Sección 7 (Motor Dinámico de Políticas) para el contrato completo.
+- Se siembra en la misma migración (vía `INSERT ... ON DUPLICATE KEY UPDATE`) para que exista **antes** de que corra el First-Run Provisioning (Sección 8) — evita el problema del huevo y la gallina (el genesis también debe poder leer una política activa).
+- `{{POLITICA_PASSWORD_DEFAULT}}` es una decisión de producto del proyecto consumidor, documentada en su Codex — el default de fábrica de este módulo es `'media'` si el proyecto consumidor no especifica lo contrario.
+- `{{DURACION_RECORDARME_DEFAULT}}` acepta únicamente `60` o `120` (Sección 3.5) — cualquier otro valor es responsabilidad exclusiva del proyecto consumidor y rompe la garantía de "opciones canónicas" de este módulo.
 
 ---
 
@@ -199,7 +223,7 @@ $token = bin2hex(random_bytes(32)); // 256 bits, criptográficamente seguro — 
 - `HttpOnly` — obligatorio siempre (bloquea acceso vía `document.cookie`, mitiga XSS de robo de sesión).
 - `SameSite=Lax` — default (protege contra CSRF en navegación cruzada manteniendo usabilidad de enlaces entrantes). Usar `Strict` solo si el flujo de negocio no requiere entrada desde enlaces externos.
 - `Secure` — obligatorio en producción (`{{APP_ENV}} === 'production'`); en local/XAMPP sobre HTTP puede omitirse solo en `{{APP_ENV}} === 'local'`.
-- `session_regenerate_id(true)` en cada login exitoso — mitiga session fixation.
+- Mitigación de session fixation: si el proyecto consumidor usa sesiones nativas de PHP (`$_SESSION`), llamar `session_regenerate_id(true)` en cada login exitoso — **pero solo dentro de una sesión ya iniciada** (`session_start()` previo), o PHP emite un *Warning* que contamina la respuesta JSON. Si el proyecto usa el esquema de Token Opaco (Sección 3.1, default de este módulo) **sin** `$_SESSION`, el equivalente ya ocurre al emitir un token nuevo (`random_bytes`) en cada login — no se llama `session_regenerate_id()` en absoluto.
 
 ### 3.3 Device Binding (IP + User-Agent)
 
@@ -220,6 +244,47 @@ Regla de negocio genérica: **ningún formulario de datos sensibles o fiscales d
 - El overlay se retira **exclusivamente** cuando una llamada al API (ej. `GET /api/estado_hito.php`) responde `{"status":"success","data":{"hito_cumplido": true}}`, reflejando `usuarios.hito_cumplido = 1` en DB.
 - **Prohibido** desbloquear el overlay por estado local, flag de frontend, o "optimismo" tras una acción del usuario — siempre se re-consulta el API. Esto evita que un usuario manipule `localStorage`/DevTools para saltarse el gate.
 - El endpoint que marca `hito_cumplido = 1` es responsabilidad del módulo de negocio consumidor (fuera de alcance de este módulo de login), pero **la lectura** del flag sí vive en el contrato de este módulo de autenticación.
+
+### 3.5 "Mantenerse Registrado" (Remember Me — Persistencia de Sesión Extendida)
+
+Checkbox opcional en el formulario de login que extiende la duración del token/cookie de sesión más allá del TTL ordinario, **sin** debilitar ninguna otra capa de seguridad (device binding, `HttpOnly`, `SameSite`, revocación inmediata siguen aplicando igual).
+
+- La duración extendida **no se hardcodea** — se lee de la misma tabla de configuración del Motor Dinámico de Políticas (Sección 7), fila única, columna `duracion_recordarme_dias`. Opciones canónicas de este módulo: **60 días (2 meses)** o **120 días (4 meses)** — el `super_admin` elige una de las dos desde el Dashboard (Sección 7.5), nunca un valor libre arbitrario.
+- Backend (`login.php`, Capa 5): si `recordarme === true` en el payload, `token_expira_en = NOW() + INTERVAL {{DURACION_RECORDARME_DIAS}} DAY` y la cookie se emite con el mismo TTL; si es `false` (default), se usa el TTL de sesión ordinario del proyecto consumidor (ej. 8 horas).
+- La cookie extendida conserva **todas** las banderas de la Sección 3.2 (`HttpOnly`, `SameSite=Lax`, `Secure` en producción) — "recordarme" extiende la duración, nunca relaja la protección del transporte.
+- El device binding (Sección 3.3) se sigue validando en cada request sin excepción — una sesión "recordada" robada desde otro dispositivo sigue siendo rechazada por mismatch de `device_hash`.
+
+### 3.6 Recuperación de Contraseña (Password Reset)
+
+Mismo patrón de token de un solo uso que la invitación (Sección 9.2), aplicado al flujo de "Olvidé mi contraseña" — reutiliza el contrato, no lo reinventa.
+
+```sql
+CREATE TABLE `{{TABLE_PREFIX}}recuperacion_password` (
+    `id`          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `usuario_id`  BIGINT UNSIGNED NOT NULL,
+    `token_hash`  CHAR(64)        NOT NULL COMMENT 'SHA-256 del token — el token en claro solo viaja en el email',
+    `expira_en`   DATETIME        NOT NULL COMMENT 'TTL corto — {{TTL_RECUPERACION}}, ej. 1 hora (más corto que una invitación)',
+    `usado`       TINYINT(1)      NOT NULL DEFAULT 0,
+    `creado_en`   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY `uq_{{TABLE_PREFIX}}recuperacion_token_hash` (`token_hash`),
+    KEY `idx_{{TABLE_PREFIX}}recuperacion_usuario` (`usuario_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+**Paso 1 — Solicitud (endpoint público, ej. `recuperar_password.php`):**
+- Recibe solo `email`. **Anti-enumeración estricta:** la respuesta es **siempre** `{"status":"success","message":"Si el correo existe, recibirás un enlace."}` — idéntica exista o no la cuenta, con el mismo tiempo de respuesta (mismo principio de la Sección 2.2).
+- Si el email existe y `estatus = 'activo'`, genera `tokenClaro = bin2hex(random_bytes(32))`, persiste solo el hash, y dispara la plantilla de correo transaccional con el enlace firmado (`{{RUTA_RESTABLECER}}?token=$tokenClaro`).
+- Invalida (marca `usado = 1`) cualquier token de recuperación previo no usado del mismo `usuario_id` antes de crear uno nuevo — evita que enlaces viejos sigan siendo válidos en paralelo.
+
+**Paso 2 — Vista standalone de restablecimiento:**
+- Ruta pública temporal (ej. `/restablecer-password.php?token=...`), sin sesión previa.
+- Incluye **obligatoriamente** el Visibility Toggle y el Medidor de Fuerza 0-100% (Sección 4.6), calibrados contra la política activa (Sección 7).
+- Valida `token_hash` + `expira_en > NOW()` + `usado = 0`, igual que la invitación — mismo mensaje genérico ante cualquier fallo ("Este enlace ya no es válido").
+
+**Paso 3 — Confirmación (endpoint público, ej. `restablecer_password.php`):**
+- Valida la nueva contraseña contra `passwordCumplePolitica()` (Sección 7) antes de aceptar.
+- `UPDATE usuarios SET password_hash = ...` + `UPDATE recuperacion_password SET usado = 1` en una sola transacción.
+- Tras el éxito, **revoca la sesión activa existente** (`token_acceso = NULL`) del usuario si la tenía — un reset de contraseña implica que cualquier sesión anterior (potencialmente comprometida) deja de ser válida.
 
 ---
 
@@ -312,6 +377,69 @@ function submitLogin(payload) {
 - El contenedor de error dedicado (`#auth-error-container`) es persistente en el DOM (no desaparece solo); se oculta únicamente cuando el usuario reintenta con éxito.
 - El botón de retorno/reintento se habilita **antes** de cualquier `return` temprano de la función que detectó el fallo, garantizando que el usuario nunca quede con la UI congelada sin salida.
 
+### 4.6 Controles de Contraseña — Visibility Toggle y Medidor de Fuerza
+
+**Todo** `<input type="password">` de este módulo incluye un botón "ojito" (Password Visibility Toggle):
+
+```html
+<div class="password-field">
+    <input class="auth-input" type="password" id="{{CAMPO_ID}}" name="password" autocomplete="{{new-password|current-password}}" required>
+    <button type="button" class="password-field__toggle" data-password-toggle="{{CAMPO_ID}}" aria-label="Mostrar contraseña" aria-pressed="false">👁</button>
+</div>
+```
+
+```javascript
+function initPasswordToggles() {
+    document.querySelectorAll('[data-password-toggle]').forEach(function (btn) {
+        const input = document.getElementById(btn.dataset.passwordToggle);
+        if (!input) {
+            return;
+        }
+
+        btn.addEventListener('click', function () {
+            const visible = input.type === 'text';
+            input.type = visible ? 'password' : 'text';
+            btn.setAttribute('aria-pressed', String(!visible));
+            btn.setAttribute('aria-label', visible ? 'Mostrar contraseña' : 'Ocultar contraseña');
+        });
+    });
+}
+```
+
+- El toggle **nunca** dispara el submit del formulario (`type="button"`, nunca `type="submit"`).
+- Cambiar la visibilidad **no** limpia ni reformatea el valor del input — el usuario debe poder verificar exactamente lo que escribió antes de enviar.
+
+**Medidor de fuerza (0-100%)** bajo todo formulario de creación/cambio de contraseña — lee la política activa (Sección 7) para calibrar sus umbrales, nunca hardcodea los suyos propios:
+
+```html
+<div class="password-strength" data-password-strength-for="{{CAMPO_ID}}">
+    <div class="password-strength__track">
+        <div class="password-strength__fill" data-password-strength-fill></div>
+    </div>
+    <p class="password-strength__label" data-password-strength-label></p>
+</div>
+```
+
+```javascript
+function calcularFuerzaPassword(password, politica) {
+    // `politica` = { longitud_minima, requiere_mayuscula, requiere_minuscula, requiere_numero, requiere_simbolo }
+    const checks = [
+        password.length >= politica.longitud_minima,
+        !politica.requiere_mayuscula || /[A-Z]/.test(password),
+        !politica.requiere_minuscula || /[a-z]/.test(password),
+        !politica.requiere_numero || /[0-9]/.test(password),
+        !politica.requiere_simbolo || /[^a-zA-Z0-9]/.test(password),
+    ];
+
+    const cumplidos = checks.filter(Boolean).length;
+    return Math.round((cumplidos / checks.length) * 100);
+}
+```
+
+- El porcentaje se recalcula en cada evento `input` — nunca solo al enviar el formulario (feedback en tiempo real, Fricción Cero).
+- El relleno de la barra (`.password-strength__fill`) anima únicamente `width` sobre un contenedor de altura fija (`.password-strength__track`) — es la única excepción documentada a "nunca animar `width`" (Sección 5.3) porque aquí `width` **es** la información que se comunica, no un efecto decorativo, y el contenedor padre no cambia de tamaño (no hay reflow del layout circundante).
+- Colores de la barra (`débil`/`media`/`fuerte`) se mapean a variables ya declaradas (`--auth-accent` y variantes), nunca colores hardcodeados nuevos.
+
 ---
 
 ## 5. 📱 ARQUITECTURA DEL DASHBOARD UNIVERSAL (MOBILE-FIRST 90+)
@@ -392,26 +520,258 @@ function initDashNav() {
 - **Backdrop del menú:** `.dash-nav-backdrop` fijo, `opacity` 0→1 con `pointer-events` condicionado, igual que el patrón de lightbox/modal ya usado en este módulo (consistencia de patrones dentro del mismo sistema).
 - **Áreas táctiles:** el botón hamburguesa y todo ítem de `.dash-nav__link` mantienen un área mínima de 44×44px vía `padding`, nunca vía `width`/`height` fijos.
 
+### 5.3.1 Navegación en Acordeón (Anti-Crowding Sidebar)
+
+**Prohibido** un `.dash-nav__list` plano con más de ~5 ítems — a partir de ahí, el menú se organiza en grupos colapsables (`{{GRUPO_1}}`, `{{GRUPO_2}}`, ...), cada uno con sus propios ítems internos. Solo un grupo permanece abierto a la vez (acordeón real, no simplemente colapsable independiente) — mantiene la interfaz limpia en pantallas táctiles pequeñas.
+
+```html
+<nav class="dash-nav" data-dash-nav>
+    <div class="dash-accordion" data-accordion-group>
+        <button type="button" class="dash-accordion__trigger" data-accordion-trigger aria-expanded="false">
+            {{GRUPO_NOMBRE}}
+        </button>
+        <ul class="dash-accordion__panel" data-accordion-panel hidden>
+            <li><a href="#{{ANCLA_1}}" class="dash-nav__link">{{ITEM_1}}</a></li>
+            <li><a href="#{{ANCLA_2}}" class="dash-nav__link">{{ITEM_2}}</a></li>
+        </ul>
+    </div>
+    <!-- ...un .dash-accordion por grupo -->
+</nav>
+```
+
+```javascript
+function initAccordionNav() {
+    document.querySelectorAll('[data-accordion-trigger]').forEach(function (trigger) {
+        trigger.addEventListener('click', function () {
+            const grupo = trigger.closest('[data-accordion-group]');
+            const panel = grupo.querySelector('[data-accordion-panel]');
+            const abrirlo = trigger.getAttribute('aria-expanded') !== 'true';
+
+            // Cierra todos los demás grupos — solo uno abierto a la vez.
+            document.querySelectorAll('[data-accordion-trigger]').forEach(function (otro) {
+                otro.setAttribute('aria-expanded', 'false');
+                otro.closest('[data-accordion-group]').querySelector('[data-accordion-panel]').hidden = true;
+            });
+
+            trigger.setAttribute('aria-expanded', String(abrirlo));
+            panel.hidden = !abrirlo;
+        });
+    });
+}
+```
+
+- La transición de apertura anima `max-height`/`opacity` de forma atómica (o `grid-template-rows: 0fr → 1fr` si el proyecto consumidor soporta ese patrón moderno) — nunca `height: auto` directo, que no es animable de forma nativa.
+- Cerrar todos los demás grupos al abrir uno nuevo es intencional (Sección de negocio: "Anti-Crowding") — evita que el usuario pierda contexto con múltiples paneles largos abiertos simultáneamente en una pantalla pequeña.
+
+### 5.3.2 Conmutador de Paneles (Anti-Saturación del Área de Trabajo)
+
+El acordeón (Sección 5.3.1) resuelve el amontonamiento del **menú**; este patrón resuelve el amontonamiento del **contenido**. La pantalla de inicio del Dashboard, inmediatamente después del login, muestra **únicamente** el bloque de bienvenida (Sección 10) — ningún módulo operativo (alta de usuarios, configuraciones, ledgers, etc.) se renderiza visible por defecto.
+
+```html
+<!-- Cada sección operativa nace oculta -->
+<section id="{{MODULO_ID}}" class="dash-panel" hidden>...</section>
+
+<!-- Cada disparador de navegación declara qué panel(es) activa -->
+<a href="#{{MODULO_ID}}" class="dash-nav__link" data-panel-target="{{MODULO_ID}}">{{ETIQUETA}}</a>
+```
+
+```javascript
+function initDashPanelSwitcher() {
+    const disparadores = document.querySelectorAll('[data-panel-target]');
+    const paneles = document.querySelectorAll('.dash-panel');
+
+    function mostrarPaneles(destino) {
+        const idsVisibles = destino === '' ? [] : destino.split(',');
+        paneles.forEach(function (panel) {
+            panel.hidden = !idsVisibles.includes(panel.id);
+        });
+    }
+
+    disparadores.forEach(function (el) {
+        el.addEventListener('click', function (event) {
+            const href = el.getAttribute('href');
+            if (el.tagName === 'A' && href && href.startsWith('#')) {
+                event.preventDefault(); // nunca el salto de ancla nativo del navegador
+            }
+            mostrarPaneles(el.dataset.panelTarget);
+        });
+    });
+}
+```
+
+- `data-panel-target` acepta una lista separada por comas — un disparador de **grupo** (ej. el trigger del acordeón "{{GRUPO_NOMBRE}}") puede revelar varios paneles relacionados a la vez (todo lo que pertenece a esa área de producto), mientras que un disparador de **ítem específico** dentro del grupo típicamente apunta a un solo panel.
+- `data-panel-target=""` (cadena vacía, ej. el ítem "Inicio") es el estado de reposo — oculta todos los paneles y deja visible solo el bloque de bienvenida.
+- Un panel oculto por `hidden` **nunca** se retira del DOM — sigue siendo el mismo formulario/tabla con su estado, solo se re-muestra; evita perder el progreso de un formulario a medio llenar por navegar a otra sección y volver.
+
+### 5.4 Controles de Navegación Globales
+
+**Scroll-to-Top:** botón flotante fijo (esquina inferior, `position: fixed`) oculto por defecto, que se activa vía clase (`opacity`/`transform`, nunca `display` a secas para permitir transición) cuando `window.scrollY` supera un umbral (ej. 400px). Reutiliza el mismo patrón atómico de transición ya establecido en este módulo (Sección 4.5/5.3) — nunca dispara reflow.
+
+**Toggle Día/Noche (Light/Dark):** conmutador visual persistente (ej. `localStorage`) que alterna un atributo (`data-theme="light|dark"`) en la raíz del documento. **Nunca** se implementa duplicando reglas CSS por selector — las variables de tema (Sección 4.1) se redeclaran dentro de un bloque `[data-theme="light"]`, y todo el resto del sistema (que ya consume esas variables) cambia de apariencia automáticamente sin tocar ninguna otra regla:
+
+```css
+:root, [data-theme="dark"] {
+    --auth-bg: {{COLOR_FONDO_OSCURO}};
+    --auth-text: {{COLOR_TEXTO_SOBRE_OSCURO}};
+}
+
+[data-theme="light"] {
+    --auth-bg: {{COLOR_FONDO_CLARO}};
+    --auth-text: {{COLOR_TEXTO_SOBRE_CLARO}};
+}
+```
+
+```javascript
+function initThemeToggle() {
+    const toggle = document.querySelector('[data-theme-toggle]');
+    const root = document.documentElement;
+    const guardado = localStorage.getItem('{{PROJECT_NAME}}_theme');
+    if (guardado) {
+        root.setAttribute('data-theme', guardado);
+    }
+
+    if (!toggle) {
+        return;
+    }
+
+    toggle.addEventListener('click', function () {
+        const actual = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+        root.setAttribute('data-theme', actual);
+        localStorage.setItem('{{PROJECT_NAME}}_theme', actual);
+    });
+}
+```
+
+- Aplica en **todo el portal administrativo** (Dashboard y páginas de acceso) — el proyecto consumidor decide si también lo extiende a su sitio público, evaluando si contradice una identidad de marca de paleta fija ya establecida (Regla de Oro, Sección 4.4).
+- El contraste WCAG ≥ 4.5:1 se valida en **ambos** temas, no solo en el default.
+
+### 5.5 Validación de Entorno en cada página del Dashboard
+
+- Toda página del Dashboard valida, **antes de renderizar cualquier contenido**, la cookie de sesión (Sección 3.1) server-side — mismo guard de `dashboard.php` (Sección 5.1), nunca una validación solo-cliente que permita el "flash" de contenido protegido.
+- Toda página HTML del sistema (pública o del Dashboard) declara `<link rel="icon" href="{{FAVICON_PATH}}">` en el `<head>` — el proyecto consumidor asegura que el archivo exista físicamente antes de considerar la página "terminada" (look & feel premium, cero íconos rotos en la pestaña del navegador).
+
 ---
 
 ## 6. 👑 MATRIZ DE ROLES Y JERARQUÍA EXTENSIBLE
 
 | Rol | Nivel | Alcance |
 | :--- | :---: | :--- |
-| `super_admin` | 100 | Acceso total. Único rol que puede: provisionar/revocar `admin`, ver la bitácora completa sin filtros, ejecutar acciones irreversibles de sistema. Es el usuario creado por el First-Run Provisioning (Sección 7) — **solo puede existir uno por instancia**, salvo que el proyecto consumidor documente explícitamente lo contrario en su Codex. |
-| `admin` | 80 | Gestor operativo. Puede dar de alta usuarios (Sección 8, Métodos A y B), gestionar `roles_variables`, pero **no** puede modificar ni revocar a un `super_admin`. |
+| `super_admin` | 100 | Acceso total. Único rol que puede: provisionar/revocar `admin`, gestionar la Política de Contraseña activa (Sección 7.3), ver la bitácora completa sin filtros, ejecutar acciones irreversibles de sistema. Es el usuario creado por el First-Run Provisioning (Sección 8) — **solo puede existir uno por instancia**, salvo que el proyecto consumidor documente explícitamente lo contrario en su Codex. |
+| `admin` | 80 | Gestor operativo. Puede dar de alta usuarios (Sección 9, Métodos A y B), gestionar `roles_variables`, pero **no** puede modificar ni revocar a un `super_admin`, ni cambiar la Política de Contraseña activa. |
 | `{{ROL_VARIABLE_1}}` … `{{ROL_VARIABLE_N}}` | `{{NIVEL}}` (< 80) | Espacio extensible — el proyecto consumidor define aquí sus roles de negocio (`operador`, `soporte`, `moderador`, etc.) y su alcance de permisos, registrándolos en su propio Codex antes de usarlos en código (Soberanía de Nomenclatura). |
 
 **Reglas de jerarquía:**
 - La comparación de permisos siempre es **por nivel numérico**, nunca por cadena de texto (`if ($usuario->nivel_rol >= 80)`), para que agregar un rol variable no rompa condicionales existentes.
-- Un rol nunca puede otorgar ni modificar un rol de nivel igual o superior al propio (`admin` no puede crear otro `admin` con más nivel del que él mismo tiene, ni auto-promoverse).
+- Un rol puede otorgar su propio nivel o uno inferior, **nunca** uno superior al propio (`admin` puede crear otro `admin`, pero jamás un `super_admin` — el backend recorta el rol solicitado al máximo permitido, sin confiar en el payload).
 - El campo `rol` de la tabla `{{TABLE_PREFIX}}usuarios` (Sección 1.1) se extiende de `ENUM('admin','editor','usuario')` a `ENUM('super_admin','admin','{{ROL_VARIABLE_1}}', ...)` **solo** cuando el proyecto consumidor haya definido su lista real de roles variables en su Codex — este cambio de ENUM es, en sí mismo, una alteración de schema y requiere la misma autorización explícita que cualquier otra (Mandamiento 9).
+
+### 6.1 Mapeo Dinámico de Permisos por Módulo
+
+El `super_admin` tiene **siempre** visibilidad absoluta de todo el sistema — esto **no** es configurable, es una garantía de la Sección 6. Lo que sí es configurable en runtime es qué módulos ve el rol `admin` (y, si existen, los `roles_variables`).
+
+```sql
+CREATE TABLE `{{TABLE_PREFIX}}permisos_modulos` (
+    `id`               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `modulo`           VARCHAR(60)  NOT NULL COMMENT 'Identificador estable del módulo, ej. "usuarios", "seguridad", "{{MODULO_X}}"',
+    `visible_para_rol` VARCHAR(30)  NOT NULL COMMENT 'Rol al que aplica esta fila — nunca "super_admin" (siempre ve todo)',
+    `habilitado`       TINYINT(1)   NOT NULL DEFAULT 1,
+    `actualizado_en`   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY `uq_{{TABLE_PREFIX}}permisos_modulo_rol` (`modulo`, `visible_para_rol`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+- **Fail-safe explícito:** si un módulo no tiene fila para un rol dado, el default es `habilitado = 1` (visible) — la matriz sirve para **restringir** selectivamente, no para exigir que cada módulo nuevo se registre manualmente o desaparezca por omisión. Este comportamiento se documenta en el Codex del proyecto consumidor, nunca se asume implícito en el código.
+- El endpoint de mutación (ej. `permisos_modulos.php`) exige `requireAuth($pdo, ['super_admin'])` — igual patrón que la Sección 7.3.
+- El frontend del Dashboard (Sección 5) consulta esta matriz **server-side**, en la misma página que ya valida la cookie (Sección 5.5) — un módulo deshabilitado ni siquiera se envía al HTML, no se oculta con CSS. Ocultar con CSS un módulo que el HTML igual entrega es una fuga de información (Capa 2 rota en la práctica).
 
 ---
 
-## 7. 🚀 LOOP DE PRIMER ARRANQUE: CONFIGURACIÓN GÉNESIS (FIRST-RUN PROVISIONING)
+## 7. 🎛️ MOTOR DINÁMICO DE POLÍTICAS DE CONTRASEÑA
 
-### 7.1 Detección de estado "vacío"
+Reemplaza el "estándar único de 14 caracteres" de versiones anteriores de este módulo por **tres perfiles canónicos configurables en runtime**, seleccionables por el `super_admin` desde el Dashboard, y leídos dinámicamente tanto por el backend (Capa 4 de cualquier endpoint que reciba una contraseña) como por el medidor de fuerza del frontend (Sección 4.6).
+
+### 7.1 Perfiles canónicos
+
+| Perfil | Valor ENUM | Requisitos |
+| :--- | :---: | :--- |
+| 1. Sencilla / Simple | `simple` | Mínimo 6 caracteres, cualquier tipo. |
+| 2. Mediana / Medium | `media` | Mínimo 8 caracteres, combinación obligatoria de letras **y** números. |
+| 3. Fuerte / Strong | `fuerte` | Mínimo 14 caracteres, con mayúscula, minúscula, número **y** símbolo especial obligatorios. |
+
+```php
+function politicaSeguridadDefinicion(string $perfil): array
+{
+    return match ($perfil) {
+        'simple' => ['longitud_minima' => 6, 'requiere_mayuscula' => false, 'requiere_minuscula' => false, 'requiere_numero' => false, 'requiere_simbolo' => false],
+        'media'  => ['longitud_minima' => 8, 'requiere_mayuscula' => false, 'requiere_minuscula' => true, 'requiere_numero' => true, 'requiere_simbolo' => false],
+        'fuerte' => ['longitud_minima' => 14, 'requiere_mayuscula' => true, 'requiere_minuscula' => true, 'requiere_numero' => true, 'requiere_simbolo' => true],
+        default  => politicaSeguridadDefinicion('media'),
+    };
+}
+
+function passwordCumplePolitica(string $password, array $definicion): bool
+{
+    if (mb_strlen($password) < $definicion['longitud_minima']) {
+        return false;
+    }
+
+    if ($definicion['requiere_mayuscula'] && preg_match('/[A-Z]/', $password) !== 1) {
+        return false;
+    }
+
+    if ($definicion['requiere_minuscula'] && preg_match('/[a-z]/', $password) !== 1) {
+        return false;
+    }
+
+    if ($definicion['requiere_numero'] && preg_match('/[0-9]/', $password) !== 1) {
+        return false;
+    }
+
+    if ($definicion['requiere_simbolo'] && preg_match('/[^a-zA-Z0-9]/', $password) !== 1) {
+        return false;
+    }
+
+    return true;
+}
+```
+
+### 7.2 Lectura de la política activa (única fuente de verdad: `{{TABLE_PREFIX}}configuracion_seguridad`)
+
+```php
+function obtenerPoliticaActiva(PDO $pdo): string
+{
+    $stmt = $pdo->query('SELECT politica_password FROM {{TABLE_PREFIX}}configuracion_seguridad WHERE id = 1 LIMIT 1');
+    $fila = $stmt->fetch();
+
+    return $fila['politica_password'] ?? 'media'; // 'media' = fallback si la fila no existe aún
+}
+```
+
+- **Todo** endpoint que reciba una contraseña nueva (First-Run Provisioning, Método A, confirmación de invitación, cambio de contraseña) llama a `obtenerPoliticaActiva()` y valida con `passwordCumplePolitica()` — ninguno hardcodea su propio umbral. Esto incluye al propio First-Run Provisioning (Sección 8.2): al leer de una tabla de configuración sembrada en la misma migración (Sección 1.3), no hay problema de "huevo y gallina" con la tabla `usuarios` vacía.
+- El endpoint público de solo-lectura (Sección 7.4) expone la `politicaSeguridadDefinicion()` resultante (no el nombre crudo del ENUM únicamente) para que el medidor de fuerza del frontend (Sección 4.6) calibre sus umbrales sin duplicar las reglas en JavaScript.
+
+### 7.3 Módulo exclusivo del `super_admin` en el Dashboard
+
+- Endpoint de mutación (ej. `configuracion_seguridad.php`, método `PUT`/`POST`) exige `requireAuth($pdo, ['super_admin'])` — **ningún** otro rol puede cambiar la política activa (Capa 2).
+- El Dashboard renderiza los 3 perfiles como tarjetas seleccionables bajo el patrón ARF-Grid (Sección 5.3) — nunca un `<select>` nativo sin estilo, para mantener consistencia visual con el resto del sistema.
+- Cambiar la política **no** re-valida retroactivamente las contraseñas ya almacenadas (los hashes existentes siguen siendo válidos) — solo afecta a la próxima contraseña que se cree o cambie.
+
+### 7.4 Endpoint de lectura pública (sin autenticación)
+
+- Ruta de solo lectura (ej. `GET configuracion_seguridad.php`) — **sin** `requireAuth()`, porque las páginas públicas de creación de contraseña (First-Run Provisioning, aceptación de invitación) necesitan calibrar su medidor de fuerza (Sección 4.6) antes de que exista cualquier sesión.
+- Responde únicamente la definición de umbrales (`longitud_minima`, `requiere_mayuscula`, etc.) — **nunca** información de usuarios, tokens, ni conteos que pudieran ayudar a un atacante a enumerar el estado del sistema.
+
+### 7.5 Duración de "Mantenerse Registrado" (mismo módulo del `super_admin`)
+
+- El mismo endpoint de mutación de la Sección 7.3 acepta también `duracion_recordarme_dias` — un único formulario/panel gestiona ambas configuraciones de seguridad (política de contraseña + persistencia de sesión), no dos módulos separados.
+- Solo dos valores válidos: `60` (2 meses) o `120` (4 meses) — cualquier otro valor se rechaza en Capa 4 con 422. El Dashboard los renderiza como opciones explícitas (radio/select estilizado), nunca un input numérico libre.
+- El endpoint de lectura pública (Sección 7.4) también expone `duracion_recordarme_dias` — el checkbox "Mantenerse registrado" del login (Sección 3.5) no necesita autenticación previa para saber cuánto va a durar la sesión que está a punto de crear.
+
+---
+
+## 8. 🚀 LOOP DE PRIMER ARRANQUE: CONFIGURACIÓN GÉNESIS (FIRST-RUN PROVISIONING)
+
+### 8.1 Detección de estado "vacío"
 
 ```php
 function sistemaRequiereProvisioning(PDO $pdo): bool
@@ -423,23 +783,26 @@ function sistemaRequiereProvisioning(PDO $pdo): bool
 
 - Esta verificación se ejecuta en el punto de entrada del sistema (bootstrap/router), **antes** de resolver cualquier otra ruta.
 - Si `sistemaRequiereProvisioning() === true`, toda ruta que no sea la de inicialización redirige (302) a `{{RUTA_INICIALIZACION}}` (ej. `/setup-genesis.php`).
-- Si es `false`, `{{RUTA_INICIALIZACION}}` responde 410 Gone de forma permanente (Sección 7.4) — nunca 404 (un 404 sugiere "quizá exista en otra parte"; un 410 comunica "existió, ya no").
+- Si es `false`, `{{RUTA_INICIALIZACION}}` responde **403 Forbidden** de forma determinista y permanente (Sección 8.4) para cualquier intento de mutación (`POST`) — nunca 200, nunca expone si "existió antes" o no.
 
-### 7.2 Formulario público temporal — política de contraseña de nivel militar
+### 8.2 Formulario público temporal — política de contraseña dinámica
 
 Campos: `nombre`, `email`, `password`, `password_confirmacion`.
 
-Política de contraseña (validada en Capa 4 — Sanitización, antes de llegar a Capa 5):
-- Longitud mínima **14 caracteres** (no 8 — el estándar mínimo de este módulo para la cuenta raíz del sistema).
-- Al menos 1 mayúscula, 1 minúscula, 1 dígito, 1 símbolo.
+- La política de contraseña **no está hardcodeada** en este paso — se lee vía `obtenerPoliticaActiva()` (Sección 7.2) igual que cualquier otro endpoint de creación/cambio de contraseña. El proyecto consumidor decide, mediante la fila sembrada en `{{TABLE_PREFIX}}configuracion_seguridad` (Sección 1.3), si el arranque inicial exige el perfil `simple`, `media` o `fuerte` — este módulo no impone un mínimo especial "solo para el root" distinto del resto del sistema.
 - Rechazo explícito si coincide con listas de contraseñas comprometidas conocidas (integración opcional con un servicio de *pwned passwords* — si el proyecto consumidor no tiene ese servicio disponible, se documenta como pendiente, no se omite en silencio).
 - `password === password_confirmacion` se valida en el **backend**, nunca solo en el frontend.
 
-### 7.3 Mutación de creación — doble función (provisioning + healthcheck)
+### 8.3 Mutación de creación — doble función (provisioning + healthcheck)
 
 ```php
 try {
     $pdo->beginTransaction();
+
+    $definicion = politicaSeguridadDefinicion(obtenerPoliticaActiva($pdo));
+    if (!passwordCumplePolitica($password, $definicion)) {
+        throw new InvalidArgumentException('La contraseña no cumple la política activa.');
+    }
 
     $stmt = $pdo->prepare(
         'INSERT INTO {{TABLE_PREFIX}}usuarios (nombre, email, password_hash, rol, estatus)
@@ -463,23 +826,32 @@ try {
 }
 ```
 
-### 7.4 Auto-deshabilitación de la ruta
+### 8.4 Auto-deshabilitación de la ruta
 
-- Inmediatamente después del `COMMIT` exitoso, cualquier request subsecuente a `{{RUTA_INICIALIZACION}}` debe evaluar `sistemaRequiereProvisioning()` de nuevo y responder **410 Gone** — la ruta no se "elimina" del código (no hay redeploy), se **autodesactiva por estado de datos**, que es la única fuente de verdad.
+- Inmediatamente después del `COMMIT` exitoso, cualquier request subsecuente a `{{RUTA_INICIALIZACION}}` debe evaluar `sistemaRequiereProvisioning()` de nuevo y responder **403 Forbidden** de forma determinista — la ruta no se "elimina" del código (no hay redeploy), se **autodesactiva por estado de datos**, que es la única fuente de verdad.
 - No debe existir una variable de entorno o flag de config que reabra esta ruta — la única forma de volver a provisionar es un estado de BD verdaderamente vacío (ej. entorno de desarrollo reseteado), nunca una reactivación manual en producción.
+- El código 403 (en vez de 200 con un mensaje de error) es deliberado: un atacante automatizando reintentos contra esta ruta recibe siempre la misma respuesta determinista, sin importar cuántas veces lo intente ni qué payload envíe.
 
 ---
 
-## 8. 🔄 FLUJO DUAL DE INVITACIÓN Y ALTA DE USUARIOS
+## 9. 🔄 FLUJO DUAL DE INVITACIÓN Y ALTA DE USUARIOS
 
-### 8.1 Método A — Creación Directa
+### 9.0 Descripción Pedagógica (obligatoria en la UI)
+
+La sección de alta de usuarios del Dashboard **nunca** presenta los dos métodos como formularios desnudos — cada uno lleva una descripción breve, amigable y en lenguaje llano (no jerga técnica) explicando cuándo usarlo, dirigida al perfil real de quien administra el sistema (`{{ADMIN_NAME}}`, no necesariamente una persona técnica). Ejemplo de tono (a adaptar por el proyecto consumidor, nunca copiar literal entre proyectos — Mandamiento 10):
+
+> **Método A:** "Usa esto cuando ya conoces a la persona y quieres darle acceso de inmediato — tú defines su contraseña inicial."
+> **Método B:** "Usa esto cuando prefieras que la persona elija su propia contraseña de forma segura — le llega un correo con un enlace único."
+
+### 9.1 Método A — Creación Directa
 
 - Endpoint (ej. `usuarios_crear.php`) exige rol `admin` o superior (Capa 2).
-- Campos: `nombre`, `email`, `password` (el propio administrador la define o el sistema genera una temporal — decisión de producto del proyecto consumidor).
+- Campos: `nombre`, `email`, `password` (el propio administrador la define o el sistema genera una temporal — decisión de producto del proyecto consumidor), **`rol`** (asignado explícitamente por quien crea al usuario, no un default silencioso). Se valida con la misma `obtenerPoliticaActiva()` / `passwordCumplePolitica()` de la Sección 7.
+- Jerarquía (Sección 6): el `rol` solicitado se recorta siempre al nivel máximo que el actor puede otorgar — un `admin` nunca puede asignar un rol de nivel igual o superior al propio, sin importar qué envíe el payload.
 - `estatus = 'activo'` inmediato — sin paso intermedio.
 - Caso de uso: administrador que da de alta a alguien presencialmente o por un canal ya verificado fuera de banda.
 
-### 8.2 Método B — Invitación Segura por Plantilla
+### 9.2 Método B — Invitación Segura por Plantilla
 
 **Paso 1 — Alta en `pendiente` + token de invitación**
 
@@ -501,7 +873,9 @@ CREATE TABLE `{{TABLE_PREFIX}}invitaciones` (
 ```php
 $tokenClaro = bin2hex(random_bytes(32));
 $tokenHash  = hash('sha256', $tokenClaro);
-// INSERT usuarios (nombre, email, estatus='pendiente', password_hash=NULL)
+// INSERT usuarios (nombre, email, rol, estatus='pendiente', password_hash=NULL)
+//   — el mismo recorte de jerarquía de la Sección 9.1 aplica aquí: el actor
+//   nunca puede invitar a alguien con un rol de nivel igual o superior al propio.
 // INSERT invitaciones (usuario_id, token_hash, expira_en = NOW() + INTERVAL {{TTL_INVITACION}} HOUR)
 // El enlace firmado ({{RUTA_INVITACION}}?token=$tokenClaro) viaja SOLO por la
 // plantilla de correo transaccional — nunca se muestra en pantalla ni se loguea.
@@ -511,7 +885,7 @@ $tokenHash  = hash('sha256', $tokenClaro);
 
 - Ruta pública temporal por invitación (ej. `/invitacion.php?token=...`), sin sesión previa.
 - Valida: `hash('sha256', $tokenRecibido) === token_hash` **y** `expira_en > NOW()` **y** `usado = 0` — las tres condiciones, sin excepción.
-- Formulario: `password`, `password_confirmacion` (misma política de nivel militar de la Sección 7.2).
+- Formulario: `password`, `password_confirmacion` — validado con la política activa (Sección 7), igual que el resto del sistema. Incluye visibility toggle y medidor de fuerza (Sección 4.6).
 - Comparación de tokens con `hash_equals()` (comparación segura contra timing attacks), nunca `===` directo sobre el hash.
 
 **Paso 3 — Confirmación y activación**
@@ -546,7 +920,67 @@ try {
 
 ---
 
-## 9. ✅ VALIDACIÓN DE CONSISTENCIA DEL FLUJO
+## 10. 🧠 NÚCLEO COGNITIVO DE BIENVENIDA (BLOQUE DINÁMICO)
+
+Bloque en la cima del Dashboard, **después** del guard de autenticación (Sección 5.5) — nunca antes, nunca en una ruta pública.
+
+### 10.1 Encabezado personalizado y saludo contextual
+
+- `"Bienvenido(a), {{USER_NAME}}"` + `"Rol: {{ROL_USUARIO}}"` — ambos ya disponibles en la sesión validada (Sección 2 Capa 2), **cero** llamada adicional a la API solo para esto.
+- Saludo por franja horaria ("Buenos días" / "Buenas tardes" / "Buenas noches") calculado en el **cliente**, con la hora local del dispositivo (`new Date().getHours()`) — es puramente cosmético, no una decisión de seguridad, así que no necesita ida y vuelta al backend.
+
+### 10.2 Metadata de geolocalización (Municipio / Estado / País)
+
+- Se solicita **explícitamente** el permiso del navegador (`navigator.geolocation`) — nunca se asume ni se simula. Si el usuario lo niega o el dispositivo no lo soporta, el bloque se degrada limpiamente (oculta la línea de ubicación, **no** rompe el resto del componente).
+- La resolución de coordenadas → Municipio/Estado/País (reverse geocoding) requiere un proveedor externo con su propia política de uso y, en la mayoría de los casos, credenciales — `{{GEOCODING_PROVIDER}}` / `{{GEOCODING_API_KEY}}` en `.env` (Bóveda de Secretos, Mandamiento 12). Un proyecto consumidor sin ese proveedor contratado usa un servicio gratuito sin llave documentado explícitamente en su Codex, o deja el bloque sin esta línea — **nunca se inventa o hardcodea una respuesta falsa de ubicación.**
+
+### 10.3 Cápsula motivacional — proveedor de IA conectable
+
+- El texto motivacional lo genera `{{AI_PROVIDER_NAME}}` (el proveedor de IA real del proyecto consumidor) **solo si** existe una integración configurada (endpoint + API key en `.env`, nunca hardcodeada — Mandamiento 12). Sin esa integración, el módulo **no debe fabricar una llamada a un servicio inexistente** (Mandamiento 4, Anti-Alucinación) — usa en su lugar un banco curado de frases (contenido estático versionado por el proyecto consumidor, no generado en runtime) con selección determinística (Sección 10.4). Es una degradación explícita y documentada, no un engaño silencioso sobre "hay IA generándolo".
+- Tono de las frases (con o sin proveedor de IA real): motivador, reflexivo, empático, enfocado en crecimiento personal — el proyecto consumidor define el banco/prompt real según su propia marca; este módulo no fija contenido de copywriting.
+
+### 10.4 Persistencia diaria (eficiencia de tokens de IA)
+
+```sql
+CREATE TABLE `{{TABLE_PREFIX}}frase_bienvenida_diaria` (
+    `fecha`   DATE NOT NULL,
+    `frase`   VARCHAR(280) NOT NULL,
+    `origen`  ENUM('ia','banco_estatico') NOT NULL DEFAULT 'banco_estatico',
+    PRIMARY KEY (`fecha`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+```php
+function obtenerFraseBienvenidaDelDia(PDO $pdo): string
+{
+    $hoy = (new DateTimeImmutable())->format('Y-m-d');
+
+    $stmt = $pdo->prepare('SELECT frase FROM {{TABLE_PREFIX}}frase_bienvenida_diaria WHERE fecha = :fecha LIMIT 1');
+    $stmt->execute([':fecha' => $hoy]);
+    $fila = $stmt->fetch();
+
+    if ($fila !== false) {
+        return $fila['frase']; // ya generada hoy — cero llamada nueva a IA/banco
+    }
+
+    // {{AI_PROVIDER_NAME}} si existe integración real; si no, banco estático determinístico.
+    $fraseNueva = generarOSeleccionarFraseDelDia();
+
+    $stmt = $pdo->prepare(
+        'INSERT INTO {{TABLE_PREFIX}}frase_bienvenida_diaria (fecha, frase, origen) VALUES (:fecha, :frase, :origen)'
+    );
+    $stmt->execute([':fecha' => $hoy, ':frase' => $fraseNueva, ':origen' => '{{ORIGEN}}']);
+
+    return $fraseNueva;
+}
+```
+
+- `PRIMARY KEY (fecha)` es, en sí mismo, el mecanismo de "una sola generación por día" — no depende de un `CHECK` en PHP que podría saltarse por una condición de carrera; un segundo intento de `INSERT` en el mismo día falla por duplicado y el código simplemente relee la fila ya existente.
+- Este endpoint se sirve **una vez por carga de Dashboard**, cacheado en el cliente durante esa sesión de página — no se re-consulta en cada re-render de componentes.
+
+---
+
+## 11. ✅ VALIDACIÓN DE CONSISTENCIA DEL FLUJO
 
 | # | Verificación | Cubierto en |
 | :--- | :--- | :---: |
@@ -561,14 +995,24 @@ try {
 | 9 | UI sin reflow en estados interactivos (ARF-Grid + transform/opacity) | §4.3 |
 | 10 | UI resiliente ante fallo crítico (estado irreversible + contenedor persistente) | §4.5 |
 | 11 | Fricción Cero Gate no manipulable desde el cliente | §3.4 |
+| 12 | Política de contraseña única fuente de verdad (backend y frontend leen la misma configuración) | §7 |
+| 13 | Genesis auto-desactivado de forma determinista (403 en toda mutación posterior) | §8.4 |
+| 14 | Visibility toggle sin fugas de estado (no dispara submit, no altera el valor) | §4.6 |
+| 15 | "Recordarme" extiende TTL sin relajar cookies/device binding | §3.5 |
+| 16 | Password Reset anti-enumeración + revoca sesión previa al confirmar | §3.6 |
+| 17 | Asignación de rol siempre recortada por la jerarquía del actor (nunca confía en el payload) | §6, §9.1, §9.2 |
+| 18 | `super_admin` con visibilidad absoluta no configurable; matriz de módulos solo restringe a roles inferiores | §6.1 |
+| 19 | Módulo deshabilitado se omite server-side (no se envía al HTML) — nunca solo ocultado con CSS | §6.1 |
+| 20 | Cápsula de IA nunca fabrica una llamada a un proveedor inexistente — degrada a banco estático documentado | §10.3 |
+| 21 | Frase diaria persistida con `PRIMARY KEY (fecha)` — inmune a condiciones de carrera, sin llamadas redundantes | §10.4 |
 
-**Declaración de blindaje:** el flujo descrito no presenta lagunas lógicas conocidas entre capas — cada capa del patrón de 6 capas asume que la anterior ya validó su responsabilidad y no repite validaciones ya cubiertas, pero tampoco confía en el frontend para ninguna decisión de seguridad (el Fricción Cero Gate, el device binding y el tarpitting se resuelven siempre server-side).
+**Declaración de blindaje:** el flujo descrito no presenta lagunas lógicas conocidas entre capas — cada capa del patrón de 6 capas asume que la anterior ya validó su responsabilidad y no repite validaciones ya cubiertas, pero tampoco confía en el frontend para ninguna decisión de seguridad (el Fricción Cero Gate, el device binding, el tarpitting y la política de contraseña activa se resuelven siempre server-side).
 
 ---
 
 ## 📎 ANEXO — Checklist Operativo Heredado (v2.0)
 
-> Se conserva como capa de gobernanza y madurez enterprise. Úsalo para auditar, en un proyecto consumidor concreto, qué tan cerca está de las Fases 1-7 y del checklist de cierre original. No sustituye las Secciones 1-5 de este documento, que son el blueprint técnico obligatorio.
+> Se conserva como capa de gobernanza y madurez enterprise. Úsalo para auditar, en un proyecto consumidor concreto, qué tan cerca está de las Fases 1-7 y del checklist de cierre original. No sustituye las Secciones 1-7 de este documento, que son el blueprint técnico obligatorio.
 
 ### Fases de referencia (resumen)
 1. **Estructuración y Capa de Datos** — múltiples métodos de auth, gestión de sesiones, Codex actualizado antes de codificar.

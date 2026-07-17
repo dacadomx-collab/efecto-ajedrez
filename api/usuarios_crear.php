@@ -17,6 +17,12 @@ $pdo = (new Database())->getConnection();
 // CAPA 2 — Auth middleware: solo admin/super_admin dan de alta usuarios
 $actor = requireAuth($pdo, ['super_admin', 'admin']);
 
+// Mapeo Dinámico de Permisos (MODULO_01_LOGIN_Y_ACCESO §6.1): super_admin
+// siempre puede; admin depende de la matriz configurada por el super_admin.
+if ($actor['rol'] !== 'super_admin' && !esModuloVisible($pdo, 'usuarios', (string) $actor['rol'])) {
+    jsonResponse('error', 'No tienes permisos para esta acción.', [], 403);
+}
+
 // CAPA 4 — Payload
 if (stripos($_SERVER['CONTENT_TYPE'] ?? '', 'application/json') === false) {
     jsonResponse('error', 'Content-Type debe ser application/json.', [], 415);
@@ -37,15 +43,16 @@ if ($email === '' || mb_strlen($email) > 190 || filter_var($email, FILTER_VALIDA
     jsonResponse('error', 'El correo electrónico no es válido.', [], 422);
 }
 
-if (!passwordCumplePolitica($password)) {
-    jsonResponse('error', 'La contraseña debe tener mínimo 14 caracteres, con mayúscula, minúscula, número y símbolo.', [], 422);
+$definicionPolitica = politicaSeguridadDefinicion(obtenerPoliticaActiva($pdo));
+
+if (!passwordCumplePolitica($password, $definicionPolitica)) {
+    jsonResponse('error', mensajePoliticaPassword($definicionPolitica), [], 422);
 }
 
-// Jerarquía: un admin no puede crear un super_admin (solo el propio
-// super_admin puede promover a ese nivel).
-$rolNuevo = ($actor['rol'] === 'super_admin' && ($payload['rol'] ?? '') === 'super_admin')
-    ? 'super_admin'
-    : 'admin';
+// Jerarquía (MODULO_01_LOGIN_Y_ACCESO §6): el rol solicitado se recorta al
+// máximo que el actor puede otorgar — nunca se confía en el payload crudo.
+$rolSolicitado = isset($payload['rol']) ? trim((string) $payload['rol']) : 'admin';
+$rolNuevo = clamparRolSegunActor($rolSolicitado, (string) $actor['rol']);
 
 // CAPA 5 — Persistencia
 try {

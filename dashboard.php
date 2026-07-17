@@ -37,6 +37,67 @@ if ($usuarioActual === null) {
     header('Location: login.php');
     exit;
 }
+
+$esSuperAdmin = $usuarioActual['rol'] === 'super_admin';
+
+$politicaActiva = 'media';
+$duracionRecordarmeActiva = 60;
+$verUsuarios = $esSuperAdmin || esModuloVisible($pdo, 'usuarios', (string) $usuarioActual['rol']);
+$verSeguridad = $esSuperAdmin || esModuloVisible($pdo, 'seguridad', (string) $usuarioActual['rol']);
+$verLanding = $esSuperAdmin || esModuloVisible($pdo, 'landing', (string) $usuarioActual['rol']);
+$verInvitados = $esSuperAdmin || esModuloVisible($pdo, 'invitados', (string) $usuarioActual['rol']);
+
+$interesados = [];
+$sesiones = [];
+if ($verInvitados) {
+    try {
+        $interesados = $pdo->query(
+            'SELECT nombre, email, edad, ciudad, estado, ip, ip_pais, ip_estado, ip_ciudad, created_at
+             FROM registro_interesados ORDER BY created_at DESC'
+        )->fetchAll();
+
+        $sesiones = $pdo->query(
+            'SELECT hs.id, hs.fecha_hora, hs.tema,
+                    COUNT(hsa.id) AS notificados,
+                    SUM(CASE WHEN hsa.checkin_en IS NOT NULL THEN 1 ELSE 0 END) AS asistieron
+             FROM historial_sesiones hs
+             LEFT JOIN historial_sesiones_asistentes hsa ON hsa.sesion_id = hs.id
+             GROUP BY hs.id
+             ORDER BY hs.fecha_hora DESC
+             LIMIT 10'
+        )->fetchAll();
+    } catch (PDOException $e) {
+        error_log('[' . date('Y-m-d H:i:s') . '] dashboard.php invitados: ' . $e->getMessage() . PHP_EOL, 3, __DIR__ . '/logs/error.log');
+    }
+}
+
+if ($esSuperAdmin || $verSeguridad) {
+    try {
+        $configSeguridad = obtenerConfiguracionSeguridad($pdo);
+        $politicaActiva = $configSeguridad['politica_password'];
+        $duracionRecordarmeActiva = $configSeguridad['duracion_recordarme_dias'];
+    } catch (PDOException $e) {
+        error_log('[' . date('Y-m-d H:i:s') . '] dashboard.php politica: ' . $e->getMessage() . PHP_EOL, 3, __DIR__ . '/logs/error.log');
+    }
+}
+
+// Matriz de permisos actual — solo se lee/renderiza para super_admin
+// (panel de control exclusivo, MODULO_01_LOGIN_Y_ACCESO §6.1).
+$matrizPermisos = ['usuarios' => true, 'seguridad' => false, 'landing' => true, 'invitados' => true];
+if ($esSuperAdmin) {
+    try {
+        foreach (array_keys($matrizPermisos) as $moduloId) {
+            $matrizPermisos[$moduloId] = esModuloVisible($pdo, $moduloId, 'admin');
+        }
+    } catch (PDOException $e) {
+        error_log('[' . date('Y-m-d H:i:s') . '] dashboard.php permisos: ' . $e->getMessage() . PHP_EOL, 3, __DIR__ . '/logs/error.log');
+    }
+}
+
+// Roles que el usuario actual puede otorgar al dar de alta a alguien más
+// (MODULO_01_LOGIN_Y_ACCESO §6) — el backend vuelve a recortar esto de forma
+// independiente en api/usuarios_crear.php y api/usuarios_invitar.php.
+$rolesAsignables = $esSuperAdmin ? ['admin', 'super_admin'] : ['admin'];
 ?>
 <!DOCTYPE html>
 <html lang="es-MX">
@@ -62,14 +123,39 @@ if ($usuarioActual === null) {
                 <span class="dash-topbar__burger-line"></span>
             </button>
             <a href="dashboard.php" class="dash-topbar__brand">El Efecto Ajedrez</a>
+            <button type="button" id="theme-toggle-btn" class="dash-topbar__theme-toggle" data-theme-toggle aria-label="Cambiar entre modo claro y oscuro">🌙</button>
             <button type="button" id="dash-logout-btn" class="dash-topbar__logout">Salir</button>
         </header>
 
         <nav class="dash-nav" id="dash-nav" data-dash-nav aria-hidden="true">
             <p class="dash-nav__user"><?php echo htmlspecialchars($usuarioActual['nombre'], ENT_QUOTES, 'UTF-8'); ?> · <?php echo htmlspecialchars($usuarioActual['rol'], ENT_QUOTES, 'UTF-8'); ?></p>
             <ul class="dash-nav__list">
-                <li><a href="dashboard.php" class="dash-nav__link">Inicio</a></li>
-                <li><a href="#usuarios" class="dash-nav__link">Usuarios</a></li>
+                <li><a href="dashboard.php" class="dash-nav__link" data-panel-target="">Inicio</a></li>
+            </ul>
+
+            <?php if ($verUsuarios): ?>
+            <div class="dash-accordion" data-accordion-group>
+                <button type="button" class="dash-accordion__trigger" data-accordion-trigger data-panel-target="usuarios" aria-expanded="false">Gestión de Accesos</button>
+                <ul class="dash-accordion__panel" data-accordion-panel hidden>
+                    <li><a href="#metodo-directo" class="dash-nav__link" data-panel-target="usuarios">Alta Directiva</a></li>
+                    <li><a href="#metodo-invitacion" class="dash-nav__link" data-panel-target="usuarios">Invitación Segura</a></li>
+                </ul>
+            </div>
+            <?php endif; ?>
+
+            <?php if ($verLanding || $verInvitados): ?>
+            <div class="dash-accordion" data-accordion-group>
+                <button type="button" class="dash-accordion__trigger" data-accordion-trigger data-panel-target="landing,invitados" aria-expanded="false">Círculo de Lectura</button>
+                <ul class="dash-accordion__panel" data-accordion-panel hidden>
+                    <?php if ($verLanding): ?><li><a href="#landing" class="dash-nav__link" data-panel-target="landing,invitados">Editar Canvas</a></li><?php endif; ?>
+                    <?php if ($verInvitados): ?><li><a href="#invitados" class="dash-nav__link" data-panel-target="landing,invitados">Invitados Confirmados</a></li><?php endif; ?>
+                </ul>
+            </div>
+            <?php endif; ?>
+
+            <ul class="dash-nav__list">
+                <?php if ($verSeguridad): ?><li><a href="#seguridad" class="dash-nav__link" data-panel-target="seguridad">Seguridad</a></li><?php endif; ?>
+                <?php if ($esSuperAdmin): ?><li><a href="#permisos" class="dash-nav__link" data-panel-target="permisos">Permisos</a></li><?php endif; ?>
                 <li><a href="index.php" class="dash-nav__link">Ver sitio público</a></li>
             </ul>
         </nav>
@@ -78,16 +164,22 @@ if ($usuarioActual === null) {
 
         <main class="dash-content">
             <div class="container">
-                <h1 class="section__title">Bienvenido(a), <?php echo htmlspecialchars($usuarioActual['nombre'], ENT_QUOTES, 'UTF-8'); ?></h1>
-                <p class="section__lead dash-content__rol">Rol: <?php echo htmlspecialchars($usuarioActual['rol'], ENT_QUOTES, 'UTF-8'); ?></p>
+                <section class="aura-welcome" id="aura-welcome" data-aura-welcome>
+                    <p class="aura-welcome__saludo" id="aura-saludo">Bienvenido(a), <?php echo htmlspecialchars($usuarioActual['nombre'], ENT_QUOTES, 'UTF-8'); ?></p>
+                    <p class="aura-welcome__rol">Rol: <?php echo htmlspecialchars($usuarioActual['rol'], ENT_QUOTES, 'UTF-8'); ?></p>
+                    <p class="aura-welcome__ubicacion" id="aura-ubicacion" hidden></p>
+                    <p class="aura-welcome__frase" id="aura-frase">Cargando tu cápsula del día…</p>
+                </section>
 
-                <?php if ($usuarioActual['rol'] === 'super_admin' || $usuarioActual['rol'] === 'admin'): ?>
-                <section id="usuarios" class="dash-panel">
+                <?php if ($verUsuarios): ?>
+                <section id="usuarios" class="dash-panel" hidden>
                     <h2 class="dash-panel__title">Alta de usuarios</h2>
+                    <p class="dash-panel__intro">Aquí puedes dar de acceso al Dashboard a las personas que colaboran contigo. Elige el método según lo que te resulte más cómodo.</p>
 
                     <div class="dash-panel__grid">
                         <form id="usuario-crear-form" class="lead-form" novalidate>
-                            <h3 class="auth-page__title">Método A — Creación Directa</h3>
+                            <h3 id="metodo-directo" class="auth-page__title">Método A — Creación Directa</h3>
+                            <p class="dash-panel__hint">Usa esto cuando ya conoces a la persona y quieres darle acceso de inmediato — tú defines su contraseña inicial.</p>
                             <div class="lead-form__field">
                                 <label class="lead-form__label" for="crear-nombre">Nombre</label>
                                 <input class="lead-form__input" type="text" id="crear-nombre" name="nombre" required>
@@ -97,15 +189,33 @@ if ($usuarioActual === null) {
                                 <input class="lead-form__input" type="email" id="crear-email" name="email" required>
                             </div>
                             <div class="lead-form__field">
+                                <label class="lead-form__label" for="crear-rol">Rol</label>
+                                <select class="lead-form__input" id="crear-rol" name="rol">
+                                    <?php foreach ($rolesAsignables as $rolOpcion): ?>
+                                        <option value="<?php echo htmlspecialchars($rolOpcion, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($rolOpcion, ENT_QUOTES, 'UTF-8'); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="lead-form__field">
                                 <label class="lead-form__label" for="crear-password">Contraseña</label>
-                                <input class="lead-form__input" type="password" id="crear-password" name="password" minlength="14" required>
+                                <div class="password-field">
+                                    <input class="lead-form__input" type="password" id="crear-password" name="password" autocomplete="new-password" required>
+                                    <button type="button" class="password-field__toggle" data-password-toggle="crear-password" aria-label="Mostrar contraseña" aria-pressed="false">👁</button>
+                                </div>
+                                <div class="password-strength" data-password-strength-for="crear-password">
+                                    <div class="password-strength__track">
+                                        <div class="password-strength__fill" data-password-strength-fill></div>
+                                    </div>
+                                    <p class="password-strength__label" data-password-strength-label></p>
+                                </div>
                             </div>
                             <button type="submit" class="btn btn--primary lead-form__submit">Crear usuario activo</button>
                             <p id="usuario-crear-status" class="lead-form__status" role="status" aria-live="polite"></p>
                         </form>
 
                         <form id="usuario-invitar-form" class="lead-form" novalidate>
-                            <h3 class="auth-page__title">Método B — Invitación Segura</h3>
+                            <h3 id="metodo-invitacion" class="auth-page__title">Método B — Invitación Segura</h3>
+                            <p class="dash-panel__hint">Usa esto cuando prefieras que la persona elija su propia contraseña de forma segura — le llega un correo con un enlace único.</p>
                             <div class="lead-form__field">
                                 <label class="lead-form__label" for="invitar-nombre">Nombre</label>
                                 <input class="lead-form__input" type="text" id="invitar-nombre" name="nombre" required>
@@ -114,15 +224,202 @@ if ($usuarioActual === null) {
                                 <label class="lead-form__label" for="invitar-email">Correo electrónico</label>
                                 <input class="lead-form__input" type="email" id="invitar-email" name="email" required>
                             </div>
+                            <div class="lead-form__field">
+                                <label class="lead-form__label" for="invitar-rol">Rol</label>
+                                <select class="lead-form__input" id="invitar-rol" name="rol">
+                                    <?php foreach ($rolesAsignables as $rolOpcion): ?>
+                                        <option value="<?php echo htmlspecialchars($rolOpcion, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($rolOpcion, ENT_QUOTES, 'UTF-8'); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
                             <button type="submit" class="btn btn--primary lead-form__submit">Enviar invitación</button>
                             <p id="usuario-invitar-status" class="lead-form__status" role="status" aria-live="polite"></p>
                         </form>
                     </div>
                 </section>
                 <?php endif; ?>
+
+                <?php if ($verLanding): ?>
+                <section id="landing" class="dash-panel" hidden>
+                    <h2 class="dash-panel__title">Landing Page — Círculo de Lectura</h2>
+                    <p class="dash-panel__intro">Edita los textos y la fotografía de la página pública tal como la ve tu audiencia — haz clic directo sobre cada elemento para cambiarlo.</p>
+                    <a href="club-lectura.php?modo_edicion=1" class="btn btn--primary">Editar Landing Page</a>
+                </section>
+                <?php endif; ?>
+
+                <?php if ($verInvitados): ?>
+                <section id="invitados" class="dash-panel" hidden>
+                    <h2 class="dash-panel__title">Invitados Confirmados</h2>
+                    <p class="dash-panel__intro">Comparte el enlace de la próxima sesión: se actualiza la Landing Page pública y se notifica por correo a todos los interesados registrados.</p>
+
+                    <form id="sesion-compartir-form" class="lead-form" novalidate>
+                        <div class="lead-form__field">
+                            <label class="lead-form__label" for="sesion-enlace">Enlace de Google Meet / Zoom</label>
+                            <input class="lead-form__input" type="url" id="sesion-enlace" name="enlace" placeholder="https://meet.google.com/xxx-xxxx-xxx" required>
+                        </div>
+                        <div class="lead-form__field">
+                            <label class="lead-form__label" for="sesion-fecha">Fecha y hora programada</label>
+                            <input class="lead-form__input" type="datetime-local" id="sesion-fecha" name="fecha_hora">
+                        </div>
+                        <div class="lead-form__field">
+                            <label class="lead-form__label" for="sesion-tema">Libro o tema de la sesión (opcional)</label>
+                            <input class="lead-form__input" type="text" id="sesion-tema" name="tema">
+                        </div>
+                        <button type="submit" class="btn btn--primary lead-form__submit">Compartir</button>
+                        <p id="sesion-compartir-status" class="lead-form__status" role="status" aria-live="polite"></p>
+                    </form>
+
+                    <h3 class="auth-page__title dash-panel__subtitle">Material de lectura (PDF)</h3>
+                    <p class="dash-panel__hint">Solo podrán descargarlo los asistentes que confirmen su check-in real en la sesión — el interés inicial no es suficiente.</p>
+                    <form id="material-subir-form" class="lead-form" novalidate>
+                        <div class="lead-form__field">
+                            <label class="lead-form__label" for="material-sesion-id">Sesión</label>
+                            <select class="lead-form__input" id="material-sesion-id" name="sesion_id" required>
+                                <option value="">Selecciona una sesión</option>
+                                <?php foreach ($sesiones as $sesion): ?>
+                                    <option value="<?php echo (int) $sesion['id']; ?>"><?php echo htmlspecialchars((string) $sesion['fecha_hora'], ENT_QUOTES, 'UTF-8'); ?> — <?php echo htmlspecialchars((string) ($sesion['tema'] ?? 'Sin tema'), ENT_QUOTES, 'UTF-8'); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="lead-form__field">
+                            <label class="lead-form__label" for="material-archivo">Archivo PDF (máx. 20MB)</label>
+                            <input class="lead-form__input" type="file" id="material-archivo" name="material" accept="application/pdf" required>
+                        </div>
+                        <button type="submit" class="btn btn--primary lead-form__submit">Subir material</button>
+                        <p id="material-subir-status" class="lead-form__status" role="status" aria-live="polite"></p>
+                    </form>
+
+                    <h3 class="auth-page__title dash-panel__subtitle">Historial de sesiones</h3>
+                    <div class="dash-table-wrap">
+                        <table class="dash-table">
+                            <thead>
+                                <tr><th>Fecha</th><th>Tema</th><th>Notificados</th><th>Asistieron</th></tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($sesiones)): ?>
+                                    <tr><td colspan="4">Aún no se ha compartido ninguna sesión.</td></tr>
+                                <?php else: ?>
+                                    <?php foreach ($sesiones as $sesion): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars((string) $sesion['fecha_hora'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td><?php echo htmlspecialchars((string) ($sesion['tema'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td><?php echo (int) $sesion['notificados']; ?></td>
+                                        <td><?php echo (int) $sesion['asistieron']; ?></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="auth-page__title dash-panel__subtitle">Interesados registrados (<?php echo count($interesados); ?>)</h3>
+                    <div class="dash-table-wrap">
+                        <table class="dash-table">
+                            <thead>
+                                <tr><th>Nombre</th><th>Correo</th><th>Edad</th><th>Ciudad</th><th>Estado</th><th>IP</th><th>Ubicación (IP)</th><th>Registrado</th></tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($interesados)): ?>
+                                    <tr><td colspan="8">Aún no hay interesados registrados.</td></tr>
+                                <?php else: ?>
+                                    <?php foreach ($interesados as $persona): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($persona['nombre'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td><?php echo htmlspecialchars($persona['email'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td><?php echo htmlspecialchars((string) $persona['edad'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td><?php echo htmlspecialchars($persona['ciudad'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td><?php echo htmlspecialchars($persona['estado'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td><?php echo htmlspecialchars($persona['ip'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td><?php echo htmlspecialchars(implode(', ', array_filter([$persona['ip_ciudad'], $persona['ip_estado'], $persona['ip_pais']])) ?: '—', ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td><?php echo htmlspecialchars((string) $persona['created_at'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+                <?php endif; ?>
+
+                <?php if ($verSeguridad): ?>
+                <section id="seguridad" class="dash-panel" hidden>
+                    <h2 class="dash-panel__title">Política de Seguridad de Contraseñas</h2>
+                    <p class="section__lead dash-content__rol">Perfil activo: <strong id="politica-activa-actual"><?php echo htmlspecialchars($politicaActiva, ENT_QUOTES, 'UTF-8'); ?></strong></p>
+
+                    <form id="politica-seguridad-form" novalidate>
+                        <div class="dash-panel__grid">
+                            <label class="arf-grid__item policy-card">
+                                <input type="radio" name="perfil" value="simple" class="policy-card__radio" <?php echo $politicaActiva === 'simple' ? 'checked' : ''; ?>>
+                                <span class="policy-card__title">1. Sencilla</span>
+                                <span class="policy-card__text">Mínimo 6 caracteres, cualquier tipo.</span>
+                            </label>
+                            <label class="arf-grid__item policy-card">
+                                <input type="radio" name="perfil" value="media" class="policy-card__radio" <?php echo $politicaActiva === 'media' ? 'checked' : ''; ?>>
+                                <span class="policy-card__title">2. Mediana</span>
+                                <span class="policy-card__text">Mínimo 8 caracteres, letras y números.</span>
+                            </label>
+                            <label class="arf-grid__item policy-card">
+                                <input type="radio" name="perfil" value="fuerte" class="policy-card__radio" <?php echo $politicaActiva === 'fuerte' ? 'checked' : ''; ?>>
+                                <span class="policy-card__title">3. Fuerte</span>
+                                <span class="policy-card__text">Mínimo 14 caracteres, mayúscula, minúscula, número y símbolo.</span>
+                            </label>
+                        </div>
+
+                        <h3 class="auth-page__title dash-panel__subtitle">Duración de "Mantenerme registrado"</h3>
+                        <div class="dash-panel__grid">
+                            <label class="arf-grid__item policy-card">
+                                <input type="radio" name="duracion_recordarme_dias" value="60" class="policy-card__radio" <?php echo $duracionRecordarmeActiva === 60 ? 'checked' : ''; ?>>
+                                <span class="policy-card__title">60 días</span>
+                                <span class="policy-card__text">2 meses.</span>
+                            </label>
+                            <label class="arf-grid__item policy-card">
+                                <input type="radio" name="duracion_recordarme_dias" value="120" class="policy-card__radio" <?php echo $duracionRecordarmeActiva === 120 ? 'checked' : ''; ?>>
+                                <span class="policy-card__title">120 días</span>
+                                <span class="policy-card__text">4 meses.</span>
+                            </label>
+                        </div>
+
+                        <button type="submit" class="btn btn--primary">Aplicar política</button>
+                        <p id="politica-seguridad-status" class="lead-form__status" role="status" aria-live="polite"></p>
+                    </form>
+                </section>
+                <?php endif; ?>
+
+                <?php if ($esSuperAdmin): ?>
+                <section id="permisos" class="dash-panel" hidden>
+                    <h2 class="dash-panel__title">Mapeo de Permisos por Módulo</h2>
+                    <p class="dash-panel__intro">Como super_admin siempre ves todo el sistema. Aquí decides qué módulos también puede ver el rol "admin".</p>
+
+                    <div class="dash-panel__grid">
+                        <label class="arf-grid__item policy-card" data-permiso-card>
+                            <input type="checkbox" class="policy-card__radio" data-permiso-toggle data-modulo="usuarios" <?php echo $matrizPermisos['usuarios'] ? 'checked' : ''; ?>>
+                            <span class="policy-card__title">Usuarios</span>
+                            <span class="policy-card__text">Alta de usuarios (Métodos A y B) visible para "admin".</span>
+                        </label>
+                        <label class="arf-grid__item policy-card" data-permiso-card>
+                            <input type="checkbox" class="policy-card__radio" data-permiso-toggle data-modulo="seguridad" <?php echo $matrizPermisos['seguridad'] ? 'checked' : ''; ?>>
+                            <span class="policy-card__title">Seguridad</span>
+                            <span class="policy-card__text">Política de contraseñas y "recordarme" visible para "admin".</span>
+                        </label>
+                        <label class="arf-grid__item policy-card" data-permiso-card>
+                            <input type="checkbox" class="policy-card__radio" data-permiso-toggle data-modulo="landing" <?php echo $matrizPermisos['landing'] ? 'checked' : ''; ?>>
+                            <span class="policy-card__title">Landing Page</span>
+                            <span class="policy-card__text">Edición visual del Círculo de Lectura visible para "admin".</span>
+                        </label>
+                        <label class="arf-grid__item policy-card" data-permiso-card>
+                            <input type="checkbox" class="policy-card__radio" data-permiso-toggle data-modulo="invitados" <?php echo $matrizPermisos['invitados'] ? 'checked' : ''; ?>>
+                            <span class="policy-card__title">Invitados</span>
+                            <span class="policy-card__text">Panel de Invitados Confirmados visible para "admin".</span>
+                        </label>
+                    </div>
+                    <p id="permisos-modulos-status" class="lead-form__status" role="status" aria-live="polite"></p>
+                </section>
+                <?php endif; ?>
             </div>
         </main>
     </div>
+
+    <button type="button" id="btn-scroll-top" class="club-scroll-top" aria-label="Volver arriba">↑</button>
 
     <script src="assets/js/main.js" defer></script>
 </body>

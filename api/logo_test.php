@@ -44,16 +44,10 @@ function detectarTransparencia(string $rutaArchivo, string $extension): string
     return 'Desconocido';
 }
 
+// Auditoría de marca: evalúa específicamente las 4 variantes de logo
+// disponibles en assets/img/ (logo*.png) — no cualquier imagen del proyecto.
 $directorioImg = __DIR__ . '/../assets/img';
-$patrones = ['*.png', '*.jpg', '*.jpeg', '*.gif', '*.webp', '*.svg'];
-$archivos = [];
-
-foreach ($patrones as $patron) {
-    foreach (glob($directorioImg . '/' . $patron, GLOB_BRACE) as $rutaCompleta) {
-        $archivos[] = $rutaCompleta;
-    }
-}
-
+$archivos = glob($directorioImg . '/logo*.png') ?: [];
 sort($archivos);
 
 $muestras = [];
@@ -77,6 +71,7 @@ $fondos = [
     ['clase' => 'logo-lab__bg--grafito', 'nombre' => 'Grafito Nocturno (oficial)', 'hex' => '#10141E'],
     ['clase' => 'logo-lab__bg--obsidiana', 'nombre' => 'Negro Obsidiana (alternativo)', 'hex' => '#0A0C14'],
     ['clase' => 'logo-lab__bg--carbono', 'nombre' => 'Carbono Profundo (contraste intermedio)', 'hex' => '#1E2230'],
+    ['clase' => 'logo-lab__bg--claro', 'nombre' => 'Modo Día (comparación de contraste)', 'hex' => '#F4F5F7'],
 ];
 ?>
 <!DOCTYPE html>
@@ -86,9 +81,12 @@ $fondos = [
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Laboratorio de Logos | El Efecto Ajedrez</title>
     <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" href="../favicon.ico">
     <link rel="stylesheet" href="../assets/css/main.css">
 </head>
 <body class="logo-lab-body">
+
+    <button type="button" class="dash-topbar__theme-toggle auth-theme-toggle" data-theme-toggle aria-label="Cambiar entre modo claro y oscuro">🌙</button>
 
     <?php if (empty($muestras)): ?>
         <section class="logo-lab__bg logo-lab__bg--grafito">
@@ -126,5 +124,6 @@ $fondos = [
         </section>
     <?php endforeach; ?>
 
+    <script src="../assets/js/main.js" defer></script>
 </body>
 </html>

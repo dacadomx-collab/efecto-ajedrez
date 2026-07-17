@@ -16,6 +16,10 @@ try {
 } catch (PDOException $e) {
     error_log('[' . date('Y-m-d H:i:s') . '] setup-genesis.php: ' . $e->getMessage() . PHP_EOL, 3, __DIR__ . '/logs/error.log');
 }
+
+if (!$requiereProvisioning) {
+    http_response_code(403);
+}
 ?>
 <!DOCTYPE html>
 <html lang="es-MX">
@@ -32,7 +36,8 @@ try {
 
     <link rel="stylesheet" href="assets/css/main.css">
 </head>
-<body>
+<body class="auth-body">
+    <button type="button" class="dash-topbar__theme-toggle auth-theme-toggle" data-theme-toggle aria-label="Cambiar entre modo claro y oscuro">🌙</button>
     <main class="auth-page">
         <div class="container">
             <div class="auth-page__wrap">
@@ -55,13 +60,24 @@ try {
                         </div>
                         <div class="lead-form__field">
                             <label class="lead-form__label" for="setup-password">Contraseña</label>
-                            <input class="lead-form__input" type="password" id="setup-password" name="password" autocomplete="new-password" minlength="14" required>
+                            <div class="password-field">
+                                <input class="lead-form__input" type="password" id="setup-password" name="password" autocomplete="new-password" required>
+                                <button type="button" class="password-field__toggle" data-password-toggle="setup-password" aria-label="Mostrar contraseña" aria-pressed="false">👁</button>
+                            </div>
+                            <div class="password-strength" data-password-strength-for="setup-password">
+                                <div class="password-strength__track">
+                                    <div class="password-strength__fill" data-password-strength-fill></div>
+                                </div>
+                                <p class="password-strength__label" data-password-strength-label></p>
+                            </div>
                         </div>
                         <div class="lead-form__field">
                             <label class="lead-form__label" for="setup-password-confirmacion">Confirmar contraseña</label>
-                            <input class="lead-form__input" type="password" id="setup-password-confirmacion" name="password_confirmacion" autocomplete="new-password" minlength="14" required>
+                            <div class="password-field">
+                                <input class="lead-form__input" type="password" id="setup-password-confirmacion" name="password_confirmacion" autocomplete="new-password" required>
+                                <button type="button" class="password-field__toggle" data-password-toggle="setup-password-confirmacion" aria-label="Mostrar contraseña" aria-pressed="false">👁</button>
+                            </div>
                         </div>
-                        <p class="auth-page__hint">Mínimo 14 caracteres, con mayúscula, minúscula, número y símbolo.</p>
                         <button type="submit" class="btn btn--primary lead-form__submit">Crear cuenta raíz</button>
                         <p id="setup-genesis-status" class="lead-form__status" role="status" aria-live="polite"></p>
                     </form>
@@ -79,6 +95,8 @@ try {
             </div>
         </div>
     </main>
+
+    <button type="button" id="btn-scroll-top" class="club-scroll-top" aria-label="Volver arriba">↑</button>
 
     <script src="assets/js/main.js" defer></script>
 </body>

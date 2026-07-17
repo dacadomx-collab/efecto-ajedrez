@@ -22,6 +22,22 @@
     --font-base: "Inter", "Open Sans", system-ui, -apple-system, sans-serif;
 }
 
+/* Toggle Día/Noche — MODULO_01_LOGIN_Y_ACCESO §5.4. Escenario intencional:
+   SOLO el área administrativa (Dashboard + páginas de acceso, marcadas con
+   body.dash-body / body.auth-body) puede pasar a modo claro. El sitio
+   público (index.php, club-lectura.html) mantiene su paleta fija "Trinchera
+   Nocturna" de la Regla de Oro — es identidad de marca, no un tema. */
+body.dash-body[data-theme="light"],
+body.auth-body[data-theme="light"],
+body.logo-lab-body[data-theme="light"] {
+    --ajedrez-bg: #F4F5F7;
+    --ajedrez-bg-obsidiana: #E7E9EC;
+    --ajedrez-bg-elevated: #FFFFFF;
+    --ajedrez-bg-carbono: #E1E4E8;
+    --ajedrez-text: #10141E;
+    --ajedrez-text-muted: #4A5160;
+}
+
 * {
     box-sizing: border-box;
 }
@@ -481,6 +497,20 @@ a {
 
 .logo-lab__bg--carbono {
     background-color: var(--ajedrez-bg-carbono);
+}
+
+.logo-lab__bg--claro {
+    background-color: #F4F5F7;
+}
+
+.logo-lab__bg--claro .logo-lab__title,
+.logo-lab__bg--claro .logo-lab__filename {
+    color: #10141E;
+}
+
+.logo-lab__bg--claro .logo-lab__hex,
+.logo-lab__bg--claro .arf-grid__meta {
+    color: #4A5160;
 }
 
 .logo-lab__heading {
@@ -1181,6 +1211,417 @@ a {
     flex: 1 1 320px;
     max-width: 400px;
     margin: 0;
+}
+
+/* ── CONTROLES DE CONTRASEÑA — Visibility Toggle y Medidor de Fuerza ──────── */
+
+.password-field {
+    position: relative;
+}
+
+.password-field .lead-form__input {
+    padding-right: 3rem;
+}
+
+.password-field__toggle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    opacity: 0.7;
+    transition: opacity 0.18s ease;
+}
+
+.password-field__toggle:hover {
+    opacity: 1;
+}
+
+.password-field__toggle[aria-pressed="true"] {
+    opacity: 1;
+}
+
+.password-strength {
+    margin: 0.6rem 0 1.1rem;
+}
+
+.password-strength__track {
+    width: 100%;
+    height: 6px;
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+
+.password-strength__fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background-color: var(--ajedrez-accent);
+    transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.22s ease;
+}
+
+.password-strength__fill[data-level="debil"] {
+    background-color: #EF4444;
+}
+
+.password-strength__fill[data-level="media"] {
+    background-color: #F59E0B;
+}
+
+.password-strength__fill[data-level="fuerte"] {
+    background-color: #4ADE80;
+}
+
+.password-strength__label {
+    margin: 0.35rem 0 0;
+    font-size: 0.78rem;
+    color: var(--ajedrez-text-muted);
+}
+
+/* ── TARJETAS DE POLÍTICA DE SEGURIDAD (dashboard.php, super_admin) ───────── */
+
+.policy-card {
+    flex: 1 1 220px;
+    max-width: 280px;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 0.5rem;
+    padding: 1.5rem;
+    cursor: pointer;
+    position: relative;
+}
+
+.policy-card__radio {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--ajedrez-accent);
+}
+
+.policy-card:has(.policy-card__radio:checked) {
+    border-color: var(--ajedrez-accent);
+    box-shadow: 0 0 0 1px var(--ajedrez-accent);
+}
+
+.policy-card__title {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 1.05rem;
+}
+
+.policy-card__text {
+    color: var(--ajedrez-text-muted);
+    font-size: 0.85rem;
+}
+
+/* ── UTILIDADES DE PÁGINAS DE AUTENTICACIÓN Y DASHBOARD ───────────────────── */
+
+.lead-form__checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: -0.4rem 0 1.1rem;
+    font-size: 0.9rem;
+    color: var(--ajedrez-text-muted);
+    cursor: pointer;
+}
+
+.lead-form__checkbox-row input {
+    accent-color: var(--ajedrez-accent);
+    width: 18px;
+    height: 18px;
+}
+
+.auth-page__link-row {
+    margin: 1.25rem 0 0;
+    font-size: 0.9rem;
+}
+
+.auth-page__link-row a {
+    color: var(--ajedrez-text-muted);
+    text-decoration: underline;
+}
+
+.auth-page__link-row a:hover {
+    color: var(--ajedrez-accent);
+}
+
+.dash-panel__subtitle {
+    margin: 2rem 0 1.25rem;
+}
+
+.dash-panel__intro,
+.dash-panel__hint {
+    color: var(--ajedrez-text-muted);
+    font-size: 0.88rem;
+    margin: 0 0 1.25rem;
+}
+
+.dash-panel__hint {
+    margin: 0 0 1rem;
+}
+
+/* ── TOGGLE DÍA/NOCHE (dash-topbar, auth-page) ─────────────────────────────── */
+
+.dash-topbar__theme-toggle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: none;
+    color: var(--ajedrez-text);
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.18s ease;
+}
+
+.dash-topbar__theme-toggle:hover {
+    border-color: var(--ajedrez-accent);
+    transform: rotate(20deg);
+}
+
+.auth-theme-toggle {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 70;
+}
+
+/* ── NÚCLEO COGNITIVO DE BIENVENIDA (dashboard.php) ────────────────────────── */
+
+.aura-welcome {
+    background:
+        radial-gradient(circle at 85% 0%, var(--ajedrez-accent-soft), transparent 55%),
+        var(--ajedrez-bg-elevated);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius-base);
+    padding: 1.75rem;
+    margin-bottom: 2rem;
+}
+
+.aura-welcome__saludo {
+    font-family: var(--font-heading);
+    font-size: clamp(1.25rem, 3vw, 1.6rem);
+    margin: 0 0 0.35rem;
+}
+
+.aura-welcome__rol {
+    color: var(--ajedrez-text-muted);
+    font-size: 0.85rem;
+    margin: 0 0 0.75rem;
+}
+
+.aura-welcome__ubicacion {
+    color: var(--ajedrez-text-muted);
+    font-size: 0.85rem;
+    margin: 0 0 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.aura-welcome__frase {
+    font-style: italic;
+    color: var(--ajedrez-text);
+    border-left: 2px solid var(--ajedrez-accent);
+    padding-left: 0.9rem;
+    margin: 0;
+}
+
+/* ── MOTOR DE EDICIÓN VISUAL EN CALIENTE (club-lectura.php, modo edición) ─── */
+
+.edit-banner {
+    position: sticky;
+    top: 0;
+    z-index: 90;
+    background-color: var(--ajedrez-accent);
+    color: #FFFFFF;
+    text-align: center;
+    padding: 0.75rem 1.25rem;
+}
+
+.edit-banner__title {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    margin: 0 0 0.2rem;
+}
+
+.edit-banner__hint {
+    font-size: 0.85rem;
+    margin: 0;
+    opacity: 0.95;
+}
+
+[data-edit-mode] [data-block-id] {
+    cursor: pointer;
+    outline: 2px dashed transparent;
+    outline-offset: 4px;
+    transition: outline-color 0.18s ease;
+}
+
+[data-edit-mode] [data-block-id]:hover {
+    outline-color: var(--ajedrez-accent);
+}
+
+[data-block-id][contenteditable="true"] {
+    outline: 2px solid var(--ajedrez-accent);
+    outline-offset: 4px;
+    background-color: var(--ajedrez-accent-soft);
+}
+
+.edit-block-controls {
+    display: inline-flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.edit-block-controls__btn {
+    padding: 0.4rem 0.9rem;
+    border-radius: 999px;
+    border: none;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.edit-block-controls__guardar {
+    background-color: var(--ajedrez-accent);
+    color: #FFFFFF;
+}
+
+.edit-block-controls__cancelar {
+    background-color: transparent;
+    color: var(--ajedrez-text-muted);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.edit-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 90;
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1rem;
+    background-color: rgba(16, 20, 30, 0.95);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.edit-footer__cerrar {
+    background-color: transparent;
+    border: 1px solid var(--ajedrez-accent);
+    color: var(--ajedrez-text);
+}
+
+/* ── NAVEGACIÓN EN ACORDEÓN (Anti-Crowding Sidebar, dashboard.php) ────────── */
+
+.dash-accordion {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 0.35rem;
+}
+
+.dash-accordion__trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 0.5rem;
+    background: none;
+    border: none;
+    color: var(--ajedrez-text);
+    font-family: var(--font-heading);
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+    text-align: left;
+    cursor: pointer;
+}
+
+.dash-accordion__trigger::after {
+    content: "+";
+    color: var(--ajedrez-accent);
+    font-size: 1.1rem;
+    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dash-accordion__trigger[aria-expanded="true"]::after {
+    transform: rotate(45deg);
+}
+
+.dash-accordion__panel {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0.5rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+/* ── LEDGER TABULAR (Invitados Confirmados, dashboard.php) ────────────────── */
+
+.dash-table-wrap {
+    overflow-x: auto;
+    margin-bottom: 2rem;
+    border-radius: var(--radius-base);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.dash-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.dash-table th,
+.dash-table td {
+    padding: 0.65rem 0.9rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.dash-table th {
+    background-color: var(--ajedrez-bg-elevated);
+    color: var(--ajedrez-text-muted);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+}
+
+.dash-table tbody tr:hover {
+    background-color: var(--ajedrez-accent-soft);
+}
+
+/* ── MODAL DE CAPTACIÓN DE LEADS (club-lectura.php) ───────────────────────── */
+
+.lead-capture-modal .club-modal__panel {
+    text-align: left;
+}
+
+/* ── SALA DE CHECK-IN / LIVE GATE (checkin.php) ────────────────────────────── */
+
+.checkin-gate__btn {
+    display: block;
+    margin-top: 0.75rem;
 }
 
 /* ── RESPONSIVE — MOBILE FIRST ────────────────────────────────────────────── */

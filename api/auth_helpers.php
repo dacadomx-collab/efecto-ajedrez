@@ -31,6 +31,44 @@ function calcularIpHash(): string
     return hash('sha256', $_SERVER['REMOTE_ADDR'] ?? '');
 }
 
+/**
+ * Resolución IP → Municipio/Estado/País — MODULO_03_CRM_EVENTOS_EN_VIVO §2.
+ * Este proyecto no tiene contratado ningún proveedor de geolocalización de
+ * pago (sin API key en .env). Se usa ip-api.com (gratuito, sin credenciales,
+ * apto para bajo volumen) como mejor esfuerzo — un fallo NUNCA bloquea el
+ * registro del interesado, simplemente deja los campos en NULL
+ * (Mandamiento 4: no fabricar una respuesta falsa de ubicación).
+ */
+function resolverGeoIp(string $ip): array
+{
+    $vacio = ['pais' => null, 'estado' => null, 'ciudad' => null];
+
+    // IPs privadas/locales (desarrollo en XAMPP) no son resolubles — se evita
+    // incluso intentar la llamada de red.
+    if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+        return $vacio;
+    }
+
+    $contexto = stream_context_create(['http' => ['timeout' => 3]]);
+    $respuesta = @file_get_contents('http://ip-api.com/json/' . urlencode($ip) . '?fields=status,country,regionName,city', false, $contexto);
+
+    if ($respuesta === false) {
+        return $vacio;
+    }
+
+    $datos = json_decode($respuesta, true);
+
+    if (!is_array($datos) || ($datos['status'] ?? '') !== 'success') {
+        return $vacio;
+    }
+
+    return [
+        'pais' => $datos['country'] ?? null,
+        'estado' => $datos['regionName'] ?? null,
+        'ciudad' => $datos['city'] ?? null,
+    ];
+}
+
 function calcularDeviceHash(): string
 {
     $env = obtenerEnv();
@@ -105,17 +143,198 @@ function requireAuth(PDO $pdo, array $rolesPermitidos = []): array
     return $usuario;
 }
 
-/** Política de contraseña "nivel militar" — Sección 7.2 del MODULO_01. */
-function passwordCumplePolitica(string $password): bool
+/**
+ * Motor Dinámico de Políticas de Contraseña — MODULO_01_LOGIN_Y_ACCESO §7.
+ * Tres perfiles canónicos: simple (6+), media (8+ letras y números),
+ * fuerte (14+ mayúscula/minúscula/número/símbolo).
+ */
+function politicaSeguridadDefinicion(string $perfil): array
 {
-    if (mb_strlen($password) < 14) {
+    return match ($perfil) {
+        'simple' => ['longitud_minima' => 6, 'requiere_mayuscula' => false, 'requiere_minuscula' => false, 'requiere_numero' => false, 'requiere_simbolo' => false],
+        'fuerte' => ['longitud_minima' => 14, 'requiere_mayuscula' => true, 'requiere_minuscula' => true, 'requiere_numero' => true, 'requiere_simbolo' => true],
+        default => ['longitud_minima' => 8, 'requiere_mayuscula' => false, 'requiere_minuscula' => true, 'requiere_numero' => true, 'requiere_simbolo' => false],
+    };
+}
+
+/** Lee la fila única (id=1) de configuracion_seguridad. Respaldo seguro si no existe aún. */
+function obtenerConfiguracionSeguridad(PDO $pdo): array
+{
+    try {
+        $stmt = $pdo->query('SELECT politica_password, duracion_recordarme_dias FROM configuracion_seguridad WHERE id = 1 LIMIT 1');
+        $fila = $stmt->fetch();
+
+        return [
+            'politica_password' => $fila['politica_password'] ?? 'media',
+            'duracion_recordarme_dias' => (int) ($fila['duracion_recordarme_dias'] ?? 60),
+        ];
+    } catch (PDOException $e) {
+        error_log('[' . date('Y-m-d H:i:s') . '] configuracion_seguridad: ' . $e->getMessage() . PHP_EOL, 3, __DIR__ . '/../logs/error.log');
+
+        return ['politica_password' => 'media', 'duracion_recordarme_dias' => 60];
+    }
+}
+
+function obtenerPoliticaActiva(PDO $pdo): string
+{
+    return obtenerConfiguracionSeguridad($pdo)['politica_password'];
+}
+
+function obtenerDuracionRecordarme(PDO $pdo): int
+{
+    return obtenerConfiguracionSeguridad($pdo)['duracion_recordarme_dias'];
+}
+
+/**
+ * Jerarquía de roles (MODULO_01_LOGIN_Y_ACCESO §6) — recorta el rol solicitado
+ * al máximo que el actor puede otorgar. Nunca confía en el payload crudo.
+ * Un actor puede otorgar su propio nivel o inferior, nunca uno superior
+ * (ej. admin puede crear otro admin, pero jamás un super_admin).
+ */
+function clamparRolSegunActor(string $rolSolicitado, string $rolActor): string
+{
+    $niveles = ['super_admin' => 100, 'admin' => 80];
+    $nivelActor = $niveles[$rolActor] ?? 0;
+    $nivelSolicitado = $niveles[$rolSolicitado] ?? 0;
+
+    if ($nivelSolicitado <= 0 || $nivelSolicitado > $nivelActor) {
+        return 'admin';
+    }
+
+    return $rolSolicitado;
+}
+
+/**
+ * Mapeo Dinámico de Permisos por Módulo — MODULO_01_LOGIN_Y_ACCESO §6.1.
+ * super_admin ve siempre todo (no configurable). Para otros roles, un
+ * módulo sin fila se considera habilitado (fail-safe: restringe, no exige
+ * registro manual de cada módulo nuevo).
+ */
+function esModuloVisible(PDO $pdo, string $modulo, string $rol): bool
+{
+    if ($rol === 'super_admin') {
+        return true;
+    }
+
+    try {
+        $stmt = $pdo->prepare('SELECT habilitado FROM permisos_modulos WHERE modulo = :modulo AND visible_para_rol = :rol LIMIT 1');
+        $stmt->execute([':modulo' => $modulo, ':rol' => $rol]);
+        $fila = $stmt->fetch();
+
+        return $fila === false || (int) $fila['habilitado'] === 1;
+    } catch (PDOException $e) {
+        error_log('[' . date('Y-m-d H:i:s') . '] permisos_modulos: ' . $e->getMessage() . PHP_EOL, 3, __DIR__ . '/../logs/error.log');
+
+        return true; // fail-safe: un error de lectura no debe tumbar el Dashboard
+    }
+}
+
+/**
+ * Núcleo Cognitivo de Bienvenida — MODULO_01_LOGIN_Y_ACCESO §10.3/10.4.
+ * Este proyecto no tiene contratado ningún proveedor de IA ("AURA") — no hay
+ * endpoint ni API key en .env para eso (Mandamiento 12: nunca hardcodear
+ * credenciales; Mandamiento 4: nunca fabricar una integración inexistente).
+ * La frase se toma de un banco curado, con selección determinística, y se
+ * persiste una sola vez por día (PRIMARY KEY (fecha) evita condiciones de
+ * carrera y llamadas redundantes).
+ */
+function bancoFrasesBienvenida(): array
+{
+    return [
+        'Cada paso pequeño hoy es una pieza que mueves con estrategia hacia el mañana.',
+        'La calma que le das a tu familia hoy es la fuerza que construyes para siempre.',
+        'No necesitas tener todas las respuestas — solo la disposición de seguir intentando.',
+        'Un respiro consciente vale más que mil reacciones apresuradas.',
+        'Ser paciente contigo mismo(a) también es una forma de criar con amor.',
+        'El progreso real casi nunca se ve en un solo día — confía en el proceso.',
+        'Hoy es una buena oportunidad para elegir la calma antes que el control.',
+        'Tu esfuerzo silencioso de cada día también cuenta, aunque nadie lo aplauda.',
+    ];
+}
+
+function obtenerFraseBienvenidaDelDia(PDO $pdo): string
+{
+    $hoy = (new DateTimeImmutable())->format('Y-m-d');
+
+    $stmt = $pdo->prepare('SELECT frase FROM frase_bienvenida_diaria WHERE fecha = :fecha LIMIT 1');
+    $stmt->execute([':fecha' => $hoy]);
+    $fila = $stmt->fetch();
+
+    if ($fila !== false) {
+        return $fila['frase'];
+    }
+
+    $banco = bancoFrasesBienvenida();
+    // Selección determinística por día del año — misma frase para todos los
+    // usuarios en el mismo día, sin aleatoriedad que complique la caché.
+    $indice = ((int) (new DateTimeImmutable())->format('z')) % count($banco);
+    $fraseNueva = $banco[$indice];
+
+    try {
+        $stmt = $pdo->prepare(
+            'INSERT INTO frase_bienvenida_diaria (fecha, frase, origen) VALUES (:fecha, :frase, :origen)'
+        );
+        $stmt->execute([':fecha' => $hoy, ':frase' => $fraseNueva, ':origen' => 'banco_estatico']);
+    } catch (PDOException $e) {
+        // Condición de carrera esperable (23000, duplicado) si dos requests
+        // llegaron el mismo segundo — releer la fila ya insertada por la otra.
+        if ($e->getCode() === '23000') {
+            $stmt = $pdo->prepare('SELECT frase FROM frase_bienvenida_diaria WHERE fecha = :fecha LIMIT 1');
+            $stmt->execute([':fecha' => $hoy]);
+            $filaExistente = $stmt->fetch();
+
+            return $filaExistente['frase'] ?? $fraseNueva;
+        }
+
+        error_log('[' . date('Y-m-d H:i:s') . '] frase_bienvenida_diaria: ' . $e->getMessage() . PHP_EOL, 3, __DIR__ . '/../logs/error.log');
+    }
+
+    return $fraseNueva;
+}
+
+function passwordCumplePolitica(string $password, array $definicion): bool
+{
+    if (mb_strlen($password) < $definicion['longitud_minima']) {
         return false;
     }
 
-    return preg_match('/[a-z]/', $password) === 1
-        && preg_match('/[A-Z]/', $password) === 1
-        && preg_match('/[0-9]/', $password) === 1
-        && preg_match('/[^a-zA-Z0-9]/', $password) === 1;
+    if ($definicion['requiere_mayuscula'] && preg_match('/[A-Z]/', $password) !== 1) {
+        return false;
+    }
+
+    if ($definicion['requiere_minuscula'] && preg_match('/[a-z]/', $password) !== 1) {
+        return false;
+    }
+
+    if ($definicion['requiere_numero'] && preg_match('/[0-9]/', $password) !== 1) {
+        return false;
+    }
+
+    if ($definicion['requiere_simbolo'] && preg_match('/[^a-zA-Z0-9]/', $password) !== 1) {
+        return false;
+    }
+
+    return true;
+}
+
+function mensajePoliticaPassword(array $definicion): string
+{
+    $requisitos = ['mínimo ' . $definicion['longitud_minima'] . ' caracteres'];
+
+    if ($definicion['requiere_mayuscula']) {
+        $requisitos[] = 'mayúscula';
+    }
+    if ($definicion['requiere_minuscula']) {
+        $requisitos[] = 'minúscula';
+    }
+    if ($definicion['requiere_numero']) {
+        $requisitos[] = 'número';
+    }
+    if ($definicion['requiere_simbolo']) {
+        $requisitos[] = 'símbolo';
+    }
+
+    return 'La contraseña debe tener ' . implode(', ', $requisitos) . '.';
 }
 
 function setCookieToken(string $token, int $ttlSegundos): void
@@ -142,6 +361,45 @@ function borrarCookieToken(): void
         'path' => '/',
         'secure' => $esProduccion,
         'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+}
+
+/**
+ * Cookie de perfil NO sensible, legible por JS (a diferencia de token_acceso)
+ * — solo para que el frontend pinte nombre/rol sin otra llamada a la API.
+ * Nunca contiene password_hash, token ni ningún dato de autenticación.
+ */
+function setCookiePerfil(array $usuario, int $ttlSegundos): void
+{
+    $env = obtenerEnv();
+    $esProduccion = ($env['APP_ENV'] ?? '') === 'production';
+
+    $perfil = json_encode([
+        'nombre' => $usuario['nombre'],
+        'email' => $usuario['email'],
+        'rol' => $usuario['rol'],
+    ], JSON_UNESCAPED_UNICODE);
+
+    setcookie('usuario_perfil', (string) $perfil, [
+        'expires' => time() + $ttlSegundos,
+        'path' => '/',
+        'secure' => $esProduccion,
+        'httponly' => false,
+        'samesite' => 'Lax',
+    ]);
+}
+
+function borrarCookiePerfil(): void
+{
+    $env = obtenerEnv();
+    $esProduccion = ($env['APP_ENV'] ?? '') === 'production';
+
+    setcookie('usuario_perfil', '', [
+        'expires' => time() - 3600,
+        'path' => '/',
+        'secure' => $esProduccion,
+        'httponly' => false,
         'samesite' => 'Lax',
     ]);
 }

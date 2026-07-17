@@ -23,6 +23,7 @@ try {
     $stmt->execute([':id' => $usuario['id']]);
 
     borrarCookieToken();
+    borrarCookiePerfil();
     registrarActividad($pdo, (int) $usuario['id'], 'logout');
 
     jsonResponse('success', 'Sesión cerrada.');

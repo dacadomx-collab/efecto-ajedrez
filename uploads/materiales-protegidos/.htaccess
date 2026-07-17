@@ -1,0 +1,10 @@
+# Material literario protegido (MODULO_03_CRM_EVENTOS_EN_VIVO).
+# Acceso directo por URL SIEMPRE denegado — el único camino válido es
+# api/material_descargar.php, que exige un token de check-in confirmado
+# antes de leer y transmitir el archivo (readfile), nunca sirviéndolo
+# directamente desde este directorio.
+Require all denied
+
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>

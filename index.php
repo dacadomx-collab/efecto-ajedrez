@@ -163,7 +163,7 @@
                         <h2 id="club-promo-title" class="club-promo__title">Círculo de Lectura con Pao Palomares</h2>
                         <p class="club-promo__text">Martes y jueves, 8:30 p.m. — un espacio para desconectar, crecer y compartir en comunidad, moviendo nuestras piezas con estrategia.</p>
                     </div>
-                    <a href="club-lectura.html" class="btn btn--primary club-promo__cta">Unirme al Círculo de Lectura</a>
+                    <a href="club-lectura.php" class="btn btn--primary club-promo__cta">Unirme al Círculo de Lectura</a>
                 </div>
             </div>
         </section>

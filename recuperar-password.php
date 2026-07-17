@@ -7,7 +7,7 @@ declare(strict_types=1);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acceso al Dashboard | El Efecto Ajedrez</title>
+    <title>Recuperar Contraseña | El Efecto Ajedrez</title>
     <meta name="robots" content="noindex, nofollow">
     <link rel="icon" href="favicon.ico">
 
@@ -27,28 +27,18 @@ declare(strict_types=1);
                     <span>El Efecto Ajedrez</span>
                 </a>
 
-                <form id="login-form" class="lead-form" novalidate>
-                    <h1 class="auth-page__title">Acceso al Dashboard</h1>
+                <form id="recuperar-password-form" class="lead-form" novalidate>
+                    <h1 class="auth-page__title">Recuperar contraseña</h1>
+                    <p class="auth-page__lead">Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.</p>
                     <div class="lead-form__field">
-                        <label class="lead-form__label" for="login-email">Correo electrónico</label>
-                        <input class="lead-form__input" type="email" id="login-email" name="email" autocomplete="username" required>
+                        <label class="lead-form__label" for="recuperar-email">Correo electrónico</label>
+                        <input class="lead-form__input" type="email" id="recuperar-email" name="email" autocomplete="username" required>
                     </div>
-                    <div class="lead-form__field">
-                        <label class="lead-form__label" for="login-password">Contraseña</label>
-                        <div class="password-field">
-                            <input class="lead-form__input" type="password" id="login-password" name="password" autocomplete="current-password" required>
-                            <button type="button" class="password-field__toggle" data-password-toggle="login-password" aria-label="Mostrar contraseña" aria-pressed="false">👁</button>
-                        </div>
-                    </div>
-                    <label class="lead-form__checkbox-row" for="login-recordarme">
-                        <input type="checkbox" id="login-recordarme" name="recordarme">
-                        <span>Mantenerme registrado</span>
-                    </label>
-                    <button type="submit" class="btn btn--primary lead-form__submit">Iniciar sesión</button>
-                    <p id="login-status" class="lead-form__status" role="status" aria-live="polite"></p>
+                    <button type="submit" class="btn btn--primary lead-form__submit">Enviar enlace</button>
+                    <p id="recuperar-password-status" class="lead-form__status" role="status" aria-live="polite"></p>
                 </form>
 
-                <p class="auth-page__link-row"><a href="recuperar-password.php">¿Olvidaste tu contraseña?</a></p>
+                <p class="auth-page__link-row"><a href="login.php">Volver al acceso</a></p>
 
                 <div id="auth-error-container" class="auth-error-container" hidden role="alert">
                     <p id="auth-error-message"></p>

@@ -20,6 +20,12 @@ $pdo = (new Database())->getConnection();
 // CAPA 2 — Auth middleware: solo admin/super_admin invitan usuarios
 $actor = requireAuth($pdo, ['super_admin', 'admin']);
 
+// Mapeo Dinámico de Permisos (MODULO_01_LOGIN_Y_ACCESO §6.1): super_admin
+// siempre puede; admin depende de la matriz configurada por el super_admin.
+if ($actor['rol'] !== 'super_admin' && !esModuloVisible($pdo, 'usuarios', (string) $actor['rol'])) {
+    jsonResponse('error', 'No tienes permisos para esta acción.', [], 403);
+}
+
 // CAPA 4 — Payload
 if (stripos($_SERVER['CONTENT_TYPE'] ?? '', 'application/json') === false) {
     jsonResponse('error', 'Content-Type debe ser application/json.', [], 415);
@@ -39,6 +45,11 @@ if ($email === '' || mb_strlen($email) > 190 || filter_var($email, FILTER_VALIDA
     jsonResponse('error', 'El correo electrónico no es válido.', [], 422);
 }
 
+// Jerarquía (MODULO_01_LOGIN_Y_ACCESO §6): el rol solicitado se recorta al
+// máximo que el actor puede otorgar — nunca se confía en el payload crudo.
+$rolSolicitado = isset($payload['rol']) ? trim((string) $payload['rol']) : 'admin';
+$rolNuevo = clamparRolSegunActor($rolSolicitado, (string) $actor['rol']);
+
 // CAPA 5 — Persistencia
 try {
     $pdo->beginTransaction();
@@ -49,7 +60,7 @@ try {
     );
     $stmt->bindValue(':nombre', $nombre, PDO::PARAM_STR);
     $stmt->bindValue(':email', $email, PDO::PARAM_STR);
-    $stmt->bindValue(':rol', 'admin', PDO::PARAM_STR);
+    $stmt->bindValue(':rol', $rolNuevo, PDO::PARAM_STR);
     $stmt->bindValue(':estatus', 'pendiente', PDO::PARAM_STR);
     $stmt->execute();
 

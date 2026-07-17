@@ -10,7 +10,7 @@ $tokenValidoFormato = $token !== '' && ctype_xdigit($token) && strlen($token) ==
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aceptar Invitación | El Efecto Ajedrez</title>
+    <title>Restablecer Contraseña | El Efecto Ajedrez</title>
     <meta name="robots" content="noindex, nofollow">
     <link rel="icon" href="favicon.ico">
 
@@ -31,16 +31,15 @@ $tokenValidoFormato = $token !== '' && ctype_xdigit($token) && strlen($token) ==
                 </a>
 
                 <?php if ($tokenValidoFormato): ?>
-                    <form id="invitacion-form" class="lead-form" novalidate data-token="<?php echo htmlspecialchars($token, ENT_QUOTES, 'UTF-8'); ?>">
-                        <h1 class="auth-page__title">Define tu contraseña</h1>
-                        <p class="auth-page__lead">Última paso para activar tu acceso al Dashboard.</p>
+                    <form id="restablecer-password-form" class="lead-form" novalidate data-token="<?php echo htmlspecialchars($token, ENT_QUOTES, 'UTF-8'); ?>">
+                        <h1 class="auth-page__title">Restablecer contraseña</h1>
                         <div class="lead-form__field">
-                            <label class="lead-form__label" for="invitacion-password">Nueva contraseña</label>
+                            <label class="lead-form__label" for="restablecer-password">Nueva contraseña</label>
                             <div class="password-field">
-                                <input class="lead-form__input" type="password" id="invitacion-password" name="password" autocomplete="new-password" required>
-                                <button type="button" class="password-field__toggle" data-password-toggle="invitacion-password" aria-label="Mostrar contraseña" aria-pressed="false">👁</button>
+                                <input class="lead-form__input" type="password" id="restablecer-password" name="password" autocomplete="new-password" required>
+                                <button type="button" class="password-field__toggle" data-password-toggle="restablecer-password" aria-label="Mostrar contraseña" aria-pressed="false">👁</button>
                             </div>
-                            <div class="password-strength" data-password-strength-for="invitacion-password">
+                            <div class="password-strength" data-password-strength-for="restablecer-password">
                                 <div class="password-strength__track">
                                     <div class="password-strength__fill" data-password-strength-fill></div>
                                 </div>
@@ -48,19 +47,20 @@ $tokenValidoFormato = $token !== '' && ctype_xdigit($token) && strlen($token) ==
                             </div>
                         </div>
                         <div class="lead-form__field">
-                            <label class="lead-form__label" for="invitacion-password-confirmacion">Confirmar contraseña</label>
+                            <label class="lead-form__label" for="restablecer-password-confirmacion">Confirmar contraseña</label>
                             <div class="password-field">
-                                <input class="lead-form__input" type="password" id="invitacion-password-confirmacion" name="password_confirmacion" autocomplete="new-password" required>
-                                <button type="button" class="password-field__toggle" data-password-toggle="invitacion-password-confirmacion" aria-label="Mostrar contraseña" aria-pressed="false">👁</button>
+                                <input class="lead-form__input" type="password" id="restablecer-password-confirmacion" name="password_confirmacion" autocomplete="new-password" required>
+                                <button type="button" class="password-field__toggle" data-password-toggle="restablecer-password-confirmacion" aria-label="Mostrar contraseña" aria-pressed="false">👁</button>
                             </div>
                         </div>
-                        <button type="submit" class="btn btn--primary lead-form__submit">Activar mi cuenta</button>
-                        <p id="invitacion-status" class="lead-form__status" role="status" aria-live="polite"></p>
+                        <button type="submit" class="btn btn--primary lead-form__submit">Restablecer contraseña</button>
+                        <p id="restablecer-password-status" class="lead-form__status" role="status" aria-live="polite"></p>
                     </form>
                 <?php else: ?>
                     <div class="lead-form">
                         <h1 class="auth-page__title">Enlace no válido</h1>
-                        <p class="auth-page__lead">Este enlace de invitación no es válido. Solicita uno nuevo al administrador.</p>
+                        <p class="auth-page__lead">Este enlace de recuperación no es válido. Solicita uno nuevo.</p>
+                        <p class="auth-page__link-row"><a href="recuperar-password.php">Solicitar nuevo enlace</a></p>
                     </div>
                 <?php endif; ?>
 

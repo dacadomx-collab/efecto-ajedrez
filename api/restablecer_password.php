@@ -24,12 +24,10 @@ $token = isset($payload['token']) ? trim((string) $payload['token']) : '';
 $password = isset($payload['password']) ? (string) $payload['password'] : '';
 $passwordConfirmacion = isset($payload['password_confirmacion']) ? (string) $payload['password_confirmacion'] : '';
 
-// Mensaje único para token vacío/malformado — no distingue el motivo
-// (mismo principio anti-enumeración que login.php).
-const MENSAJE_INVITACION_INVALIDA = 'Este enlace ya no es válido.';
+const MENSAJE_TOKEN_INVALIDO = 'Este enlace ya no es válido.';
 
 if ($token === '' || !ctype_xdigit($token) || strlen($token) !== 64) {
-    jsonResponse('error', MENSAJE_INVITACION_INVALIDA, [], 410);
+    jsonResponse('error', MENSAJE_TOKEN_INVALIDO, [], 410);
 }
 
 if ($password === '' || $password !== $passwordConfirmacion) {
@@ -48,43 +46,46 @@ try {
     $tokenHash = hash('sha256', $token);
 
     $stmt = $pdo->prepare(
-        'SELECT id, usuario_id, expira_en, usado FROM invitaciones WHERE token_hash = :token_hash LIMIT 1'
+        'SELECT id, usuario_id, expira_en, usado FROM recuperacion_password WHERE token_hash = :token_hash LIMIT 1'
     );
     $stmt->bindValue(':token_hash', $tokenHash, PDO::PARAM_STR);
     $stmt->execute();
-    $invitacion = $stmt->fetch();
+    $recuperacion = $stmt->fetch();
 
-    $tokenValido = $invitacion !== false
-        && (int) $invitacion['usado'] === 0
-        && strtotime((string) $invitacion['expira_en']) > time();
+    $tokenValido = $recuperacion !== false
+        && (int) $recuperacion['usado'] === 0
+        && strtotime((string) $recuperacion['expira_en']) > time();
 
     if (!$tokenValido) {
-        jsonResponse('error', MENSAJE_INVITACION_INVALIDA, [], 410);
+        jsonResponse('error', MENSAJE_TOKEN_INVALIDO, [], 410);
     }
 
     $pdo->beginTransaction();
 
-    $stmt = $pdo->prepare('UPDATE usuarios SET password_hash = :hash, estatus = :estatus WHERE id = :id');
+    // Reset de contraseña revoca cualquier sesión activa previa — una sesión
+    // potencialmente comprometida deja de ser válida de inmediato.
+    $stmt = $pdo->prepare(
+        'UPDATE usuarios SET password_hash = :hash, token_acceso = NULL, token_expira_en = NULL WHERE id = :id'
+    );
     $stmt->bindValue(':hash', password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]), PDO::PARAM_STR);
-    $stmt->bindValue(':estatus', 'activo', PDO::PARAM_STR);
-    $stmt->bindValue(':id', $invitacion['usuario_id'], PDO::PARAM_INT);
+    $stmt->bindValue(':id', $recuperacion['usuario_id'], PDO::PARAM_INT);
     $stmt->execute();
 
-    $stmt = $pdo->prepare('UPDATE invitaciones SET usado = 1 WHERE id = :id');
-    $stmt->bindValue(':id', $invitacion['id'], PDO::PARAM_INT);
+    $stmt = $pdo->prepare('UPDATE recuperacion_password SET usado = 1 WHERE id = :id');
+    $stmt->bindValue(':id', $recuperacion['id'], PDO::PARAM_INT);
     $stmt->execute();
 
     $pdo->commit();
 
-    registrarActividad($pdo, (int) $invitacion['usuario_id'], 'invitacion_confirmada');
+    registrarActividad($pdo, (int) $recuperacion['usuario_id'], 'recuperacion_confirmada');
 
-    jsonResponse('success', 'Cuenta activada. Ya puedes iniciar sesión.');
+    jsonResponse('success', 'Contraseña actualizada. Ya puedes iniciar sesión.');
 } catch (PDOException $e) {
     if (isset($pdo) && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
 
     // CAPA 6 — Try/Catch global
-    error_log('[' . date('Y-m-d H:i:s') . '] invitacion_confirmar.php: ' . $e->getCode() . ' — ' . $e->getMessage() . PHP_EOL, 3, __DIR__ . '/../logs/error.log');
-    jsonResponse('error', 'No pudimos confirmar la invitación. Intenta de nuevo.', [], 500);
+    error_log('[' . date('Y-m-d H:i:s') . '] restablecer_password.php: ' . $e->getCode() . ' — ' . $e->getMessage() . PHP_EOL, 3, __DIR__ . '/../logs/error.log');
+    jsonResponse('error', 'No pudimos restablecer tu contraseña. Intenta de nuevo.', [], 500);
 }

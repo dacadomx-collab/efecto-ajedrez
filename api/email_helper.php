@@ -22,9 +22,27 @@ function leerRespuestaSmtp($socket): string
     return $respuesta;
 }
 
-function enviarCorreoTransaccional(string $destinatario, string $asunto, string $cuerpoHtml): bool
+// Fase de pruebas (Productor Tzunum, 2026-07-17): TODO correo transaccional
+// se intercepta y redirige a la cuenta de auditoría mientras el proyecto no
+// esté en producción — permite validar plantillas y enlaces sin escribirle
+// a destinatarios reales. Guardado como constante de código (no en .env) a
+// petición explícita, pero blindado por APP_ENV: en 'production' esta
+// constante se ignora por completo, nunca puede filtrarse por accidente.
+const CORREO_AUDITORIA_STAGING = 'dacadomx@yahoo.com';
+
+function enviarCorreoTransaccional(string $destinatarioOriginal, string $asunto, string $cuerpoHtml): bool
 {
     $env = obtenerEnv();
+    $esProduccion = ($env['APP_ENV'] ?? '') === 'production';
+    $destinatario = $destinatarioOriginal;
+
+    if (!$esProduccion) {
+        $destinatario = CORREO_AUDITORIA_STAGING;
+        $asunto = '[STAGING → originalmente para ' . $destinatarioOriginal . '] ' . $asunto;
+        $cuerpoHtml = '<p style="background:#fffae6;padding:0.75rem;border:1px solid #e0c200;"><strong>Modo de pruebas:</strong> este correo iba dirigido originalmente a <code>'
+            . htmlspecialchars($destinatarioOriginal, ENT_QUOTES, 'UTF-8') . '</code>.</p>' . $cuerpoHtml;
+    }
+
     $host = $env['SMTP_HOST'] ?? '';
     $port = (int) ($env['SMTP_PORT'] ?? 465);
     $usuario = $env['SMTP_USER'] ?? '';

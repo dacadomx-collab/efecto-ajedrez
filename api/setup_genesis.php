@@ -33,10 +33,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 try {
-    // La ruta se autodesactiva por estado de datos — 410 Gone si ya existe
-    // al menos un usuario. Nunca 404 (anti-enumeración de infraestructura).
+    // La ruta se autodesactiva por estado de datos — 403 determinista si ya
+    // existe al menos un usuario (MODULO_01_LOGIN_Y_ACCESO §8.4).
     if (!sistemaRequiereProvisioning($pdo)) {
-        jsonResponse('error', 'La inicialización ya fue completada.', [], 410);
+        jsonResponse('error', 'Esta ruta ya no está disponible.', [], 403);
     }
 } catch (PDOException $e) {
     error_log('[' . date('Y-m-d H:i:s') . '] setup_genesis.php check: ' . $e->getMessage() . PHP_EOL, 3, __DIR__ . '/../logs/error.log');
@@ -68,8 +68,10 @@ if ($password === '' || $password !== $passwordConfirmacion) {
     jsonResponse('error', 'Las contraseñas no coinciden.', [], 422);
 }
 
-if (!passwordCumplePolitica($password)) {
-    jsonResponse('error', 'La contraseña debe tener mínimo 14 caracteres, con mayúscula, minúscula, número y símbolo.', [], 422);
+$definicionPolitica = politicaSeguridadDefinicion(obtenerPoliticaActiva($pdo));
+
+if (!passwordCumplePolitica($password, $definicionPolitica)) {
+    jsonResponse('error', mensajePoliticaPassword($definicionPolitica), [], 422);
 }
 
 // CAPA 5 — Persistencia (PDO sin emulación, binding explícito)
