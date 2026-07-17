@@ -240,30 +240,22 @@ if (isset($_GET['modo_edicion']) && $_GET['modo_edicion'] === '1') {
 
     <div id="lead-capture-modal" class="club-modal lead-capture-modal" aria-hidden="true">
         <div class="club-modal__backdrop" data-lead-modal-close></div>
-        <div class="club-modal__panel" role="dialog" aria-modal="true" aria-labelledby="lead-capture-title">
+        <div class="club-modal__panel" role="dialog" aria-modal="true" aria-label="Formulario de registro al Club de Lectura">
             <button type="button" class="club-modal__close" data-lead-modal-close aria-label="Cerrar">&times;</button>
-            <h2 id="lead-capture-title" class="club-modal__title">¡Queremos conocerte! 📚</h2>
             <form id="registro-interesado-form" class="lead-form" novalidate>
                 <div class="lead-form__field">
                     <label class="lead-form__label" for="interesado-nombre">Nombre</label>
-                    <input class="lead-form__input" type="text" id="interesado-nombre" name="nombre" autocomplete="name" required>
+                    <input class="lead-form__input" type="text" id="interesado-nombre" name="nombre" autocomplete="name" pattern="^(?=.*[A-Za-zÁÉÍÓÚáéíóúÑñ])[A-Za-zÁÉÍÓÚáéíóúÑñ\s'.-]{2,120}$" title="Escribe tu nombre real (solo letras)" required>
                 </div>
                 <div class="lead-form__field">
                     <label class="lead-form__label" for="interesado-email">Correo electrónico</label>
-                    <input class="lead-form__input" type="email" id="interesado-email" name="email" autocomplete="email" required>
+                    <input class="lead-form__input" type="email" id="interesado-email" name="email" autocomplete="email" pattern="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$" required>
                 </div>
                 <div class="lead-form__field">
                     <label class="lead-form__label" for="interesado-edad">Edad</label>
-                    <input class="lead-form__input" type="number" id="interesado-edad" name="edad" min="1" max="120" required>
+                    <input class="lead-form__input" type="number" id="interesado-edad" name="edad" min="1" max="120" step="1" required>
                 </div>
-                <div class="lead-form__field">
-                    <label class="lead-form__label" for="interesado-ciudad">Ciudad</label>
-                    <input class="lead-form__input" type="text" id="interesado-ciudad" name="ciudad" required>
-                </div>
-                <div class="lead-form__field">
-                    <label class="lead-form__label" for="interesado-estado">Estado</label>
-                    <input class="lead-form__input" type="text" id="interesado-estado" name="estado" required>
-                </div>
+                <p class="lead-form__microcopy">Se parte de este gran grupo.</p>
                 <button type="submit" class="btn btn--primary lead-form__submit">Enviar</button>
                 <p id="registro-interesado-status" class="lead-form__status" role="status" aria-live="polite"></p>
             </form>

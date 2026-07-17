@@ -47,6 +47,22 @@ $verSeguridad = $esSuperAdmin || esModuloVisible($pdo, 'seguridad', (string) $us
 $verLanding = $esSuperAdmin || esModuloVisible($pdo, 'landing', (string) $usuarioActual['rol']);
 $verInvitados = $esSuperAdmin || esModuloVisible($pdo, 'invitados', (string) $usuarioActual['rol']);
 
+$registroIngreso = [];
+if ($esSuperAdmin) {
+    try {
+        $registroIngreso = $pdo->query(
+            'SELECT la.evento, la.ip, la.ip_pais, la.ip_estado, la.ip_ciudad, la.created_at, u.nombre, u.email
+             FROM log_actividad la
+             LEFT JOIN usuarios u ON u.id = la.usuario_id
+             WHERE la.evento = \'login_exitoso\'
+             ORDER BY la.created_at DESC
+             LIMIT 50'
+        )->fetchAll();
+    } catch (PDOException $e) {
+        error_log('[' . date('Y-m-d H:i:s') . '] dashboard.php registro_ingreso: ' . $e->getMessage() . PHP_EOL, 3, __DIR__ . '/logs/error.log');
+    }
+}
+
 $interesados = [];
 $sesiones = [];
 if ($verInvitados) {
@@ -122,7 +138,9 @@ $rolesAsignables = $esSuperAdmin ? ['admin', 'super_admin'] : ['admin'];
                 <span class="dash-topbar__burger-line"></span>
                 <span class="dash-topbar__burger-line"></span>
             </button>
-            <a href="dashboard.php" class="dash-topbar__brand">El Efecto Ajedrez</a>
+            <a href="dashboard.php" class="dash-topbar__brand">
+                <img src="assets/img/logo3-removebg-preview.png" alt="El Efecto Ajedrez: Mentores al Revés" class="dash-topbar__logo">
+            </a>
             <button type="button" id="theme-toggle-btn" class="dash-topbar__theme-toggle" data-theme-toggle aria-label="Cambiar entre modo claro y oscuro">🌙</button>
             <button type="button" id="dash-logout-btn" class="dash-topbar__logout">Salir</button>
         </header>
@@ -137,7 +155,7 @@ $rolesAsignables = $esSuperAdmin ? ['admin', 'super_admin'] : ['admin'];
             <div class="dash-accordion" data-accordion-group>
                 <button type="button" class="dash-accordion__trigger" data-accordion-trigger data-panel-target="usuarios" aria-expanded="false">Gestión de Accesos</button>
                 <ul class="dash-accordion__panel" data-accordion-panel hidden>
-                    <li><a href="#metodo-directo" class="dash-nav__link" data-panel-target="usuarios">Alta Directiva</a></li>
+                    <li><a href="#metodo-directo" class="dash-nav__link" data-panel-target="usuarios">Usuarios</a></li>
                     <li><a href="#metodo-invitacion" class="dash-nav__link" data-panel-target="usuarios">Invitación Segura</a></li>
                 </ul>
             </div>
@@ -147,7 +165,7 @@ $rolesAsignables = $esSuperAdmin ? ['admin', 'super_admin'] : ['admin'];
             <div class="dash-accordion" data-accordion-group>
                 <button type="button" class="dash-accordion__trigger" data-accordion-trigger data-panel-target="landing,invitados" aria-expanded="false">Círculo de Lectura</button>
                 <ul class="dash-accordion__panel" data-accordion-panel hidden>
-                    <?php if ($verLanding): ?><li><a href="#landing" class="dash-nav__link" data-panel-target="landing,invitados">Editar Canvas</a></li><?php endif; ?>
+                    <?php if ($verLanding): ?><li><a href="#landing" class="dash-nav__link" data-panel-target="landing,invitados">Edición de página</a></li><?php endif; ?>
                     <?php if ($verInvitados): ?><li><a href="#invitados" class="dash-nav__link" data-panel-target="landing,invitados">Invitados Confirmados</a></li><?php endif; ?>
                 </ul>
             </div>
@@ -236,14 +254,46 @@ $rolesAsignables = $esSuperAdmin ? ['admin', 'super_admin'] : ['admin'];
                             <p id="usuario-invitar-status" class="lead-form__status" role="status" aria-live="polite"></p>
                         </form>
                     </div>
+
+                    <?php if ($esSuperAdmin): ?>
+                    <h3 class="auth-page__title dash-panel__subtitle">Staging de Correo</h3>
+                    <p class="dash-panel__hint">Envía la plantilla real de invitación al correo de auditoría, sin crear ningún usuario.</p>
+                    <button type="button" id="btn-staging-test-invitacion" class="btn btn--primary">Enviar Correo de Prueba a Staging</button>
+                    <p id="staging-test-invitacion-status" class="lead-form__status" role="status" aria-live="polite"></p>
+
+                    <h3 class="auth-page__title dash-panel__subtitle">Registro de Ingreso</h3>
+                    <p class="dash-panel__hint">Auditoría de accesos exitosos al Dashboard — quién, cuándo, desde dónde.</p>
+                    <div class="dash-table-wrap">
+                        <table class="dash-table">
+                            <thead>
+                                <tr><th>Usuario</th><th>Correo</th><th>IP</th><th>Ubicación</th><th>Fecha y hora</th></tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($registroIngreso)): ?>
+                                    <tr><td colspan="5">Aún no hay ingresos registrados.</td></tr>
+                                <?php else: ?>
+                                    <?php foreach ($registroIngreso as $ingreso): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars((string) ($ingreso['nombre'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td><?php echo htmlspecialchars((string) ($ingreso['email'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td><?php echo htmlspecialchars((string) ($ingreso['ip'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td><?php echo htmlspecialchars(implode(', ', array_filter([$ingreso['ip_ciudad'], $ingreso['ip_estado'], $ingreso['ip_pais']])) ?: '—', ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td><?php echo htmlspecialchars((string) $ingreso['created_at'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php endif; ?>
                 </section>
                 <?php endif; ?>
 
                 <?php if ($verLanding): ?>
                 <section id="landing" class="dash-panel" hidden>
-                    <h2 class="dash-panel__title">Landing Page — Círculo de Lectura</h2>
+                    <h2 class="dash-panel__title">Edición de página</h2>
                     <p class="dash-panel__intro">Edita los textos y la fotografía de la página pública tal como la ve tu audiencia — haz clic directo sobre cada elemento para cambiarlo.</p>
-                    <a href="club-lectura.php?modo_edicion=1" class="btn btn--primary">Editar Landing Page</a>
+                    <a href="club-lectura.php?modo_edicion=1" class="btn btn--primary">Editar página</a>
                 </section>
                 <?php endif; ?>
 
@@ -327,8 +377,8 @@ $rolesAsignables = $esSuperAdmin ? ['admin', 'super_admin'] : ['admin'];
                                         <td><?php echo htmlspecialchars($persona['nombre'], ENT_QUOTES, 'UTF-8'); ?></td>
                                         <td><?php echo htmlspecialchars($persona['email'], ENT_QUOTES, 'UTF-8'); ?></td>
                                         <td><?php echo htmlspecialchars((string) $persona['edad'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                        <td><?php echo htmlspecialchars($persona['ciudad'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                        <td><?php echo htmlspecialchars($persona['estado'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td><?php echo htmlspecialchars((string) ($persona['ciudad'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></td>
+                                        <td><?php echo htmlspecialchars((string) ($persona['estado'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></td>
                                         <td><?php echo htmlspecialchars($persona['ip'], ENT_QUOTES, 'UTF-8'); ?></td>
                                         <td><?php echo htmlspecialchars(implode(', ', array_filter([$persona['ip_ciudad'], $persona['ip_estado'], $persona['ip_pais']])) ?: '—', ENT_QUOTES, 'UTF-8'); ?></td>
                                         <td><?php echo htmlspecialchars((string) $persona['created_at'], ENT_QUOTES, 'UTF-8'); ?></td>
@@ -415,6 +465,7 @@ $rolesAsignables = $esSuperAdmin ? ['admin', 'super_admin'] : ['admin'];
                     <p id="permisos-modulos-status" class="lead-form__status" role="status" aria-live="polite"></p>
                 </section>
                 <?php endif; ?>
+
             </div>
         </main>
     </div>

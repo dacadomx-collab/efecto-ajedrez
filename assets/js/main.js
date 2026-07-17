@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initSesionCompartirForm();
     initMaterialSubirForm();
     initLeadCaptureModal();
+    initStagingTestInvitacion();
 });
 
 function initLeadForm() {
@@ -1349,8 +1350,6 @@ function initLeadCaptureModal() {
         const nombre = form.elements.nombre.value.trim();
         const email = form.elements.email.value.trim();
         const edad = form.elements.edad.value.trim();
-        const ciudad = form.elements.ciudad.value.trim();
-        const estado = form.elements.estado.value.trim();
 
         submitBtn.disabled = true;
         setStatus(statusEl, 'Enviando...', 'loading');
@@ -1358,7 +1357,7 @@ function initLeadCaptureModal() {
         fetch('api/registro_interesado.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nombre: nombre, email: email, edad: edad, ciudad: ciudad, estado: estado })
+            body: JSON.stringify({ nombre: nombre, email: email, edad: edad })
         })
             .then(function (response) {
                 return response.json().then(function (data) {
@@ -1378,6 +1377,42 @@ function initLeadCaptureModal() {
             })
             .finally(function () {
                 submitBtn.disabled = false;
+            });
+    });
+}
+
+/* ── STAGING DE CORREO — Botón de disparo (dashboard.php, super_admin) ────── */
+
+function initStagingTestInvitacion() {
+    const btn = document.getElementById('btn-staging-test-invitacion');
+    if (!btn) {
+        return;
+    }
+
+    const statusEl = document.getElementById('staging-test-invitacion-status');
+
+    btn.addEventListener('click', function () {
+        btn.disabled = true;
+        setStatus(statusEl, 'Enviando...', 'loading');
+
+        fetch('api/staging_test_invitacion.php', { method: 'POST', credentials: 'same-origin' })
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    return { ok: response.ok, data: data };
+                });
+            })
+            .then(function (result) {
+                if (result.ok && result.data.status === 'success') {
+                    setStatus(statusEl, result.data.message, 'success');
+                } else {
+                    setStatus(statusEl, result.data.message || 'No pudimos enviar el correo.', 'error');
+                }
+            })
+            .catch(function () {
+                setStatus(statusEl, 'Error de conexión. Intenta de nuevo.', 'error');
+            })
+            .finally(function () {
+                btn.disabled = false;
             });
     });
 }

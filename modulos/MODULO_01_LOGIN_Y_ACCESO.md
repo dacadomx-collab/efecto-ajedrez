@@ -644,6 +644,16 @@ function initThemeToggle() {
 
 - Aplica en **todo el portal administrativo** (Dashboard y páginas de acceso) — el proyecto consumidor decide si también lo extiende a su sitio público, evaluando si contradice una identidad de marca de paleta fija ya establecida (Regla de Oro, Sección 4.4).
 - El contraste WCAG ≥ 4.5:1 se valida en **ambos** temas, no solo en el default.
+- **Bug de contraste recurrente a vigilar:** un fondo con color hardcodeado (ej. `background-color: rgba(16, 20, 30, 0.92)` fijo en una barra superior) combinado con un texto que sí usa `var(--auth-text)` produce texto invisible en cuanto el tema activo cambia — el texto conmuta correctamente pero el fondo se queda fijo. **Todo** elemento de la interfaz administrativa que tenga fondo propio debe usar una variable de tema (`var(--auth-bg-elevated)` o equivalente), nunca un valor de color fijo, sin excepción — ni siquiera "solo para el efecto de transparencia".
+- **Logo como imagen rasterizada (PNG/SVG con texto incrustado):** un logo `{{LOGO_PATH}}` con texto horneado en el propio archivo (no HTML/CSS real) **no puede** conmutar de color vía `var()` — el texto vive dentro de los píxeles de la imagen. Si el logo está diseñado en tono claro para el fondo oscuro oficial, se pierde sobre un fondo claro en modo Día. Solución sin generar un segundo archivo de logo: invertir la imagen dinámicamente vía filtro CSS, condicionado al tema activo:
+
+```css
+body[data-theme="light"] .{{CLASE_LOGO}} {
+    filter: invert(1) brightness(0.2);
+}
+```
+
+- Esta técnica solo es válida si el logo es monocromático o de bajo contraste cromático (texto claro sobre fondo transparente) — un logo con múltiples colores con significado propio (ej. un isotipo con paleta de marca) **no** debe invertirse así, porque `invert()` also invierte el matiz de cada color, no solo su luminosidad; en ese caso el proyecto consumidor necesita dos variantes de archivo reales, una por tema.
 
 ### 5.5 Validación de Entorno en cada página del Dashboard
 
@@ -917,6 +927,21 @@ try {
 
 - Una invitación usada (`usado = 1`) o expirada responde siempre el mismo mensaje genérico ("Este enlace ya no es válido"), sin distinguir la causa — mismo principio anti-enumeración de la Sección 2.2.
 - El envío de la plantilla de correo transaccional (SMTP, proveedor, diseño del email) es responsabilidad de infraestructura del proyecto consumidor — este módulo define el contrato del token y el flujo, no el transporte de correo.
+
+### 9.3 Registro de Ingreso (Auditoría de Accesos Exitosos)
+
+Subsección exclusiva de `super_admin` — quién entró, cuándo y desde dónde:
+
+```sql
+ALTER TABLE `{{TABLE_PREFIX}}log_actividad`
+    ADD COLUMN `ip` VARCHAR(45) NULL AFTER `device_hash`,
+    ADD COLUMN `ip_pais` VARCHAR(80) NULL AFTER `ip`,
+    ADD COLUMN `ip_estado` VARCHAR(80) NULL AFTER `ip_pais`,
+    ADD COLUMN `ip_ciudad` VARCHAR(80) NULL AFTER `ip_estado`;
+```
+
+- Estas columnas se pueblan **únicamente** en el evento `login_exitoso` — nunca en `login_fallido` ni en ningún otro evento. Resolver geolocalización en cada intento fallido abriría una vía de amplificación: un atacante de fuerza bruta podría agotar el límite de tasa del proveedor externo de geolocalización, o simplemente ralentizar el endpoint de login con latencia de red innecesaria en su ruta más sensible.
+- El resto de eventos siguen usando exclusivamente `ip_hash` (Sección 1.2) para correlación sin exponer PII — este registro "en claro" es la excepción deliberada, limitada al único evento que el `super_admin` necesita auditar con detalle real.
 
 ---
 

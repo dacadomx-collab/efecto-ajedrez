@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonResponse('error', 'Método no permitido.', [], 405);
 }
 
-// CAPA 4 — Payload + Sanitización
+// CAPA 4 — Payload + Sanitización + Validación estricta
 if (stripos($_SERVER['CONTENT_TYPE'] ?? '', 'application/json') === false) {
     jsonResponse('error', 'Content-Type debe ser application/json.', [], 415);
 }
@@ -22,32 +22,36 @@ $payload = json_decode((string) $raw, true);
 
 $nombre = isset($payload['nombre']) ? trim(strip_tags((string) $payload['nombre'])) : '';
 $email = isset($payload['email']) ? trim(strip_tags((string) $payload['email'])) : '';
-$edad = isset($payload['edad']) ? (int) $payload['edad'] : 0;
-$ciudad = isset($payload['ciudad']) ? trim(strip_tags((string) $payload['ciudad'])) : '';
-$estado = isset($payload['estado']) ? trim(strip_tags((string) $payload['estado'])) : '';
+$edadCruda = $payload['edad'] ?? null;
 
-if ($nombre === '' || mb_strlen($nombre) > 120) {
-    jsonResponse('error', 'El nombre es requerido y debe tener máximo 120 caracteres.', [], 422);
+// Nombre: mínimo 2 caracteres, al menos una letra real (rechaza "232323"),
+// solo letras/espacios/guiones/apóstrofes (rechaza basura tipo "$$$", "###").
+if ($nombre === '' || mb_strlen($nombre) > 120 || preg_match('/^[\p{L}\s\'.-]{2,120}$/u', $nombre) !== 1 || preg_match('/\p{L}/u', $nombre) !== 1) {
+    jsonResponse('error', 'Ingresa tu nombre real (solo letras).', [], 422);
 }
 
-if ($email === '' || mb_strlen($email) > 190 || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+// Correo: filter_var + regex estricto adicional (rechaza "ASASDASD" y
+// similares que no tengan forma real de correo).
+if ($email === '' || mb_strlen($email) > 190
+    || filter_var($email, FILTER_VALIDATE_EMAIL) === false
+    || preg_match('/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/', $email) !== 1
+) {
     jsonResponse('error', 'El correo electrónico no es válido.', [], 422);
 }
+
+// Edad: entero estricto — rechaza "30.5", "treinta", etc. (no basta con (int)).
+if (!is_numeric($edadCruda) || (float) $edadCruda !== (float) (int) $edadCruda) {
+    jsonResponse('error', 'La edad debe ser un número entero válido.', [], 422);
+}
+
+$edad = (int) $edadCruda;
 
 if ($edad < 1 || $edad > 120) {
     jsonResponse('error', 'La edad no es válida.', [], 422);
 }
 
-if ($ciudad === '' || mb_strlen($ciudad) > 120) {
-    jsonResponse('error', 'La ciudad es requerida.', [], 422);
-}
-
-if ($estado === '' || mb_strlen($estado) > 120) {
-    jsonResponse('error', 'El estado es requerido.', [], 422);
-}
-
-// IP tomada de REMOTE_ADDR — nunca de un header spoofable como
-// X-Forwarded-For sin un proxy de confianza documentado (MODULO_03 §2).
+// Municipio/Estado/País: SIEMPRE resueltos en el backend vía IP — el
+// formulario público ya no los solicita (recorte de campos).
 $ip = $_SERVER['REMOTE_ADDR'] ?? '';
 $geo = resolverGeoIp($ip);
 
@@ -63,8 +67,8 @@ try {
         ':nombre' => $nombre,
         ':email' => $email,
         ':edad' => $edad,
-        ':ciudad' => $ciudad,
-        ':estado' => $estado,
+        ':ciudad' => $geo['ciudad'],
+        ':estado' => $geo['estado'],
         ':ip' => $ip,
         ':ip_pais' => $geo['pais'],
         ':ip_estado' => $geo['estado'],

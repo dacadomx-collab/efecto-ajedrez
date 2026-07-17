@@ -38,9 +38,11 @@ function enviarCorreoTransaccional(string $destinatarioOriginal, string $asunto,
 
     if (!$esProduccion) {
         $destinatario = CORREO_AUDITORIA_STAGING;
-        $asunto = '[STAGING → originalmente para ' . $destinatarioOriginal . '] ' . $asunto;
-        $cuerpoHtml = '<p style="background:#fffae6;padding:0.75rem;border:1px solid #e0c200;"><strong>Modo de pruebas:</strong> este correo iba dirigido originalmente a <code>'
-            . htmlspecialchars($destinatarioOriginal, ENT_QUOTES, 'UTF-8') . '</code>.</p>' . $cuerpoHtml;
+        // Trazabilidad SOLO en el log interno — el asunto y el cuerpo que
+        // recibe el productor en su bandeja quedan idénticos a lo que
+        // recibiría el destinatario real en producción (auditoría visual
+        // fiel), sin banners ni prefijos de depuración.
+        error_log('[' . date('Y-m-d H:i:s') . "] email_helper.php: correo interceptado en staging — destinatario original: {$destinatarioOriginal}" . PHP_EOL, 3, __DIR__ . '/../logs/error.log');
     }
 
     $host = $env['SMTP_HOST'] ?? '';

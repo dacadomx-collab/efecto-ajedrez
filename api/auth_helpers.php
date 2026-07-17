@@ -83,18 +83,36 @@ function calcularDeviceHash(): string
     return hash('sha256', $ip . '|' . $userAgent . '|' . $pepper);
 }
 
-function registrarActividad(PDO $pdo, ?int $usuarioId, string $evento, string $detalle = ''): void
+/**
+ * $incluirGeo: SOLO true para login_exitoso (Panel "Registro de Ingreso",
+ * exclusivo super_admin). Nunca true en intentos fallidos — evita exponer el
+ * endpoint de login a la latencia y el límite de tasa de un proveedor de
+ * geolocalización externo en cada intento, incluidos los de fuerza bruta.
+ */
+function registrarActividad(PDO $pdo, ?int $usuarioId, string $evento, string $detalle = '', bool $incluirGeo = false): void
 {
     try {
+        $ip = null;
+        $geo = ['pais' => null, 'estado' => null, 'ciudad' => null];
+
+        if ($incluirGeo) {
+            $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+            $geo = resolverGeoIp((string) $ip);
+        }
+
         $stmt = $pdo->prepare(
-            'INSERT INTO log_actividad (usuario_id, evento, ip_hash, device_hash, detalle)
-             VALUES (:usuario_id, :evento, :ip_hash, :device_hash, :detalle)'
+            'INSERT INTO log_actividad (usuario_id, evento, ip_hash, device_hash, ip, ip_pais, ip_estado, ip_ciudad, detalle)
+             VALUES (:usuario_id, :evento, :ip_hash, :device_hash, :ip, :ip_pais, :ip_estado, :ip_ciudad, :detalle)'
         );
         $stmt->execute([
             ':usuario_id' => $usuarioId,
             ':evento' => $evento,
             ':ip_hash' => calcularIpHash(),
             ':device_hash' => calcularDeviceHash(),
+            ':ip' => $ip,
+            ':ip_pais' => $geo['pais'],
+            ':ip_estado' => $geo['estado'],
+            ':ip_ciudad' => $geo['ciudad'],
             ':detalle' => $detalle,
         ]);
     } catch (PDOException $e) {

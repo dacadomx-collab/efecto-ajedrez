@@ -121,7 +121,7 @@ try {
     setCookieToken($token, $ttlSegundos);
     setCookiePerfil($usuario, $ttlSegundos);
 
-    registrarActividad($pdo, (int) $usuario['id'], 'login_exitoso');
+    registrarActividad($pdo, (int) $usuario['id'], 'login_exitoso', '', true);
 
     jsonResponse('success', 'Bienvenido(a) de nuevo.', [
         'usuario' => [

@@ -444,6 +444,14 @@ a {
     gap: 0.5rem;
 }
 
+.lead-form__microcopy {
+    color: var(--ajedrez-text-muted);
+    font-size: 0.78rem;
+    font-style: italic;
+    text-align: center;
+    margin: -0.4rem 0 1rem;
+}
+
 .lead-form__spinner {
     width: 14px;
     height: 14px;
@@ -1050,7 +1058,11 @@ a {
     align-items: center;
     gap: 1rem;
     padding: 0.85rem 1.25rem;
-    background-color: rgba(16, 20, 30, 0.92);
+    /* Bug de contraste corregido: antes era un rgba(16,20,30,...) fijo que
+       nunca respondía al toggle Día/Noche — en modo claro el texto pasaba a
+       oscuro (correcto) pero caía sobre este fondo que seguía oscuro
+       (nunca cambiaba), quedando invisible. Ahora usa la variable de tema. */
+    background-color: var(--ajedrez-bg-elevated);
     backdrop-filter: blur(8px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -1095,6 +1107,24 @@ a {
     text-decoration: none;
     font-weight: 700;
     flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+.dash-topbar__logo {
+    height: 36px;
+    width: auto;
+    display: block;
+    /* El PNG trae su texto ("EFECTO" / "mentores al revés") en tono claro,
+       pensado para el fondo oscuro oficial. En modo Día ese texto claro se
+       pierde sobre el fondo blanco — se invierte dinámicamente para que
+       transmute a tonos oscuros de alta visibilidad sin generar un segundo
+       archivo de logo. */
+    transition: filter 0.22s ease;
+}
+
+body.dash-body[data-theme="light"] .dash-topbar__logo {
+    filter: invert(1) brightness(0.2);
 }
 
 .dash-topbar__logout {
@@ -1416,6 +1446,7 @@ a {
 
 .aura-welcome__saludo {
     font-family: var(--font-heading);
+    color: var(--ajedrez-text);
     font-size: clamp(1.25rem, 3vw, 1.6rem);
     margin: 0 0 0.35rem;
 }
@@ -1622,6 +1653,17 @@ a {
 .checkin-gate__btn {
     display: block;
     margin-top: 0.75rem;
+}
+
+/* ── REGISTRO DE INGRESO (dashboard.php, panel #usuarios, super_admin) ────── */
+
+.dash-panel__subtitle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 2rem 0 1.25rem;
+    flex-wrap: wrap;
 }
 
 /* ── RESPONSIVE — MOBILE FIRST ────────────────────────────────────────────── */
