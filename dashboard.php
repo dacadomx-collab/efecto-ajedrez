@@ -197,6 +197,60 @@ $rolesAsignables = $esSuperAdmin ? ['admin', 'super_admin'] : ['admin'];
                     <p class="aura-welcome__frase" id="aura-frase">Cargando tu cápsula del día…</p>
                 </section>
 
+                <?php if ($verInvitados): ?>
+                <!-- Acceso directo a la acción principal — visible siempre en la
+                     pantalla de inicio, sin depender del conmutador de paneles del
+                     acordeón lateral (Re-Ingeniería de Jerarquía Visual, 2026-07-17). -->
+                <section class="dash-widget dash-widget--planeador" id="inicio-planeador">
+                    <h3 class="dash-widget__title">🚀 Planeador de la Próxima Sesión</h3>
+                    <p class="dash-panel__hint">Un solo lugar para preparar la próxima sesión: enlace, fecha, material y mensaje — se notifica por correo a todos los interesados registrados al presionar "Compartir".</p>
+                    <form id="planeador-live-form" class="lead-form" novalidate>
+                        <div class="lead-form__field">
+                            <label class="lead-form__label" for="sesion-enlace">Enlace de Google Meet / Zoom</label>
+                            <input class="lead-form__input" type="url" id="sesion-enlace" name="enlace" placeholder="https://meet.google.com/xxx-xxxx-xxx" required>
+                        </div>
+                        <div class="lead-form__field">
+                            <label class="lead-form__label" for="sesion-fecha">Fecha y hora programada</label>
+                            <input class="lead-form__input" type="datetime-local" id="sesion-fecha" name="fecha_hora">
+                        </div>
+                        <div class="lead-form__field">
+                            <label class="lead-form__label" for="sesion-tema">Tema del libro / Mensaje rápido (opcional)</label>
+                            <input class="lead-form__input" type="text" id="sesion-tema" name="tema" placeholder="Título del libro o tema de la sesión">
+                        </div>
+                        <div class="lead-form__field">
+                            <label class="lead-form__label" for="sesion-mensaje">Mensaje personalizado para el correo (opcional)</label>
+                            <textarea class="lead-form__input" id="sesion-mensaje" name="mensaje" rows="3" maxlength="500" placeholder="Unas palabras para tus lectores antes de la sesión..."></textarea>
+                        </div>
+                        <div class="lead-form__field">
+                            <label class="lead-form__label" for="sesion-archivo">Libro del club (PDF, opcional, máx. 20MB)</label>
+                            <input class="lead-form__input" type="file" id="sesion-archivo" name="material" accept="application/pdf">
+                        </div>
+                        <button type="submit" class="btn btn--primary lead-form__submit">Compartir</button>
+                        <p id="planeador-live-status" class="lead-form__status" role="status" aria-live="polite"></p>
+                    </form>
+
+                    <h3 class="auth-page__title dash-panel__subtitle">De un vistazo</h3>
+                    <div class="dash-panel__grid dash-kpi-grid">
+                        <div class="arf-grid__item dash-kpi-card">
+                            <span class="dash-kpi-card__label">Fecha programada</span>
+                            <span class="dash-kpi-card__value"><?php echo $sesionActiva !== null ? htmlspecialchars((string) $sesionActiva['fecha_hora'], ENT_QUOTES, 'UTF-8') : 'Sin sesión activa'; ?></span>
+                        </div>
+                        <div class="arf-grid__item dash-kpi-card">
+                            <span class="dash-kpi-card__label">Libro activo</span>
+                            <span class="dash-kpi-card__value"><?php echo $sesionActiva !== null ? htmlspecialchars((string) ($sesionActiva['tema'] ?? 'Sin tema'), ENT_QUOTES, 'UTF-8') : '—'; ?></span>
+                        </div>
+                        <div class="arf-grid__item dash-kpi-card">
+                            <span class="dash-kpi-card__label">Participantes confirmados</span>
+                            <span class="dash-kpi-card__value"><?php echo count($interesados); ?></span>
+                        </div>
+                        <div class="arf-grid__item dash-kpi-card">
+                            <span class="dash-kpi-card__label">Total de usuarios del sistema</span>
+                            <span class="dash-kpi-card__value"><?php echo $totalUsuariosSistema; ?></span>
+                        </div>
+                    </div>
+                </section>
+                <?php endif; ?>
+
                 <?php if ($verUsuarios): ?>
                 <section id="usuarios" class="dash-panel" hidden>
                     <h2 class="dash-panel__title">Alta de usuarios</h2>
@@ -340,58 +394,7 @@ $rolesAsignables = $esSuperAdmin ? ['admin', 'super_admin'] : ['admin'];
                 <?php if ($verInvitados): ?>
                 <section id="invitados" class="dash-panel" hidden>
                     <h2 class="dash-panel__title">Invitados Confirmados</h2>
-
-                    <!-- SECCIÓN A — Planeador Live: la acción más usada del día a día,
-                         siempre lo primero que ve el operador al entrar a este panel. -->
-                    <div class="dash-widget dash-widget--planeador">
-                        <h3 class="dash-widget__title">🚀 Planeador de la Próxima Sesión</h3>
-                        <p class="dash-panel__hint">Un solo lugar para preparar la próxima sesión: enlace, fecha, material y mensaje — se notifica por correo a todos los interesados registrados al presionar "Compartir".</p>
-                        <form id="planeador-live-form" class="lead-form" novalidate>
-                            <div class="lead-form__field">
-                                <label class="lead-form__label" for="sesion-enlace">Enlace de Google Meet / Zoom</label>
-                                <input class="lead-form__input" type="url" id="sesion-enlace" name="enlace" placeholder="https://meet.google.com/xxx-xxxx-xxx" required>
-                            </div>
-                            <div class="lead-form__field">
-                                <label class="lead-form__label" for="sesion-fecha">Fecha y hora programada</label>
-                                <input class="lead-form__input" type="datetime-local" id="sesion-fecha" name="fecha_hora">
-                            </div>
-                            <div class="lead-form__field">
-                                <label class="lead-form__label" for="sesion-tema">Tema del libro / Mensaje rápido (opcional)</label>
-                                <input class="lead-form__input" type="text" id="sesion-tema" name="tema" placeholder="Título del libro o tema de la sesión">
-                            </div>
-                            <div class="lead-form__field">
-                                <label class="lead-form__label" for="sesion-mensaje">Mensaje personalizado para el correo (opcional)</label>
-                                <textarea class="lead-form__input" id="sesion-mensaje" name="mensaje" rows="3" maxlength="500" placeholder="Unas palabras para tus lectores antes de la sesión..."></textarea>
-                            </div>
-                            <div class="lead-form__field">
-                                <label class="lead-form__label" for="sesion-archivo">Libro del club (PDF, opcional, máx. 20MB)</label>
-                                <input class="lead-form__input" type="file" id="sesion-archivo" name="material" accept="application/pdf">
-                            </div>
-                            <button type="submit" class="btn btn--primary lead-form__submit">Compartir</button>
-                            <p id="planeador-live-status" class="lead-form__status" role="status" aria-live="polite"></p>
-                        </form>
-                    </div>
-
-                    <!-- SECCIÓN B — Métricas activas en tarjetas (KPIs de un vistazo). -->
-                    <h3 class="auth-page__title dash-panel__subtitle">De un vistazo</h3>
-                    <div class="dash-panel__grid dash-kpi-grid">
-                        <div class="arf-grid__item dash-kpi-card">
-                            <span class="dash-kpi-card__label">Fecha programada</span>
-                            <span class="dash-kpi-card__value"><?php echo $sesionActiva !== null ? htmlspecialchars((string) $sesionActiva['fecha_hora'], ENT_QUOTES, 'UTF-8') : 'Sin sesión activa'; ?></span>
-                        </div>
-                        <div class="arf-grid__item dash-kpi-card">
-                            <span class="dash-kpi-card__label">Libro activo</span>
-                            <span class="dash-kpi-card__value"><?php echo $sesionActiva !== null ? htmlspecialchars((string) ($sesionActiva['tema'] ?? 'Sin tema'), ENT_QUOTES, 'UTF-8') : '—'; ?></span>
-                        </div>
-                        <div class="arf-grid__item dash-kpi-card">
-                            <span class="dash-kpi-card__label">Participantes confirmados</span>
-                            <span class="dash-kpi-card__value"><?php echo count($interesados); ?></span>
-                        </div>
-                        <div class="arf-grid__item dash-kpi-card">
-                            <span class="dash-kpi-card__label">Total de usuarios del sistema</span>
-                            <span class="dash-kpi-card__value"><?php echo $totalUsuariosSistema; ?></span>
-                        </div>
-                    </div>
+                    <p class="dash-panel__intro">El Planeador de la Próxima Sesión y las tarjetas "De un vistazo" ahora viven en la pantalla de inicio del Dashboard — aquí queda el historial completo y el detalle de cada interesado.</p>
 
                     <!-- SECCIÓN C — Historial de sesiones (ledger compacto, al final). -->
                     <h3 class="auth-page__title dash-panel__subtitle">Historial de sesiones</h3>
