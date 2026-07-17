@@ -21,18 +21,25 @@ requireAuth($pdo, ['super_admin']);
 
 // Este endpoint NUNCA toca las tablas usuarios/invitaciones — es
 // exclusivamente una previsualización de la plantilla HTML real, enviada al
-// correo de auditoría (email_helper.php redirige automáticamente mientras
-// APP_ENV !== 'production'). El token del enlace es solo para fines
-// visuales — no se persiste, no resuelve una invitación real.
+// propio buzón transaccional configurado en .env (SMTP_USER). El token del
+// enlace es solo para fines visuales — no se persiste, no resuelve una
+// invitación real. email_helper.php ya no redirige destinatarios (Mandamiento
+// 12) — este endpoint apunta directamente a un buzón real y existente, nunca
+// a una dirección inventada.
 $env = obtenerEnv();
 $tokenPreview = bin2hex(random_bytes(32));
 $enlacePreview = rtrim($env['APP_URL'] ?? '', '/') . '/invitacion.php?token=' . $tokenPreview;
+$correoAuditor = $env['SMTP_USER'] ?? '';
+
+if ($correoAuditor === '') {
+    jsonResponse('error', 'SMTP_USER no está configurado en .env.', [], 500);
+}
 
 // Misma función de plantilla que usa api/usuarios_invitar.php — el
 // productor debe auditar exactamente el mismo diseño que recibirá
 // cualquier invitado real, sin ningún texto de vista previa visible.
 $enviado = enviarCorreoTransaccional(
-    'preview@efecto-ajedrez.local',
+    $correoAuditor,
     'Invitación al Dashboard — El Efecto Ajedrez',
     construirPlantillaInvitacion('Paola Palomares', $enlacePreview)
 );

@@ -146,28 +146,13 @@ function construirPlantillaInvitacion(string $nombre, string $enlaceInvitacion, 
     HTML;
 }
 
-// Fase de pruebas (Productor Tzunum, 2026-07-17): TODO correo transaccional
-// se intercepta y redirige a la cuenta de auditoría mientras el proyecto no
-// esté en producción — permite validar plantillas y enlaces sin escribirle
-// a destinatarios reales. Guardado como constante de código (no en .env) a
-// petición explícita, pero blindado por APP_ENV: en 'production' esta
-// constante se ignora por completo, nunca puede filtrarse por accidente.
-const CORREO_AUDITORIA_STAGING = 'dacadomx@yahoo.com';
-
 function enviarCorreoTransaccional(string $destinatarioOriginal, string $asunto, string $cuerpoHtml): bool
 {
     $env = obtenerEnv();
-    $esProduccion = ($env['APP_ENV'] ?? '') === 'production';
+    // Destinatario final SIEMPRE dinámico — inyectado directamente desde el
+    // parámetro real recibido por la función (Mandamiento 12: prohibido
+    // redirigir a buzones fijos, de auditoría o heredados del andamiaje).
     $destinatario = $destinatarioOriginal;
-
-    if (!$esProduccion) {
-        $destinatario = CORREO_AUDITORIA_STAGING;
-        // Trazabilidad SOLO en el log interno — el asunto y el cuerpo que
-        // recibe el productor en su bandeja quedan idénticos a lo que
-        // recibiría el destinatario real en producción (auditoría visual
-        // fiel), sin banners ni prefijos de depuración.
-        error_log('[' . date('Y-m-d H:i:s') . "] email_helper.php: correo interceptado en staging — destinatario original: {$destinatarioOriginal}" . PHP_EOL, 3, __DIR__ . '/../logs/error.log');
-    }
 
     $host = $env['SMTP_HOST'] ?? '';
     $port = (int) ($env['SMTP_PORT'] ?? 465);
