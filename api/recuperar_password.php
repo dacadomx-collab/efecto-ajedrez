@@ -63,8 +63,7 @@ try {
 
         $pdo->commit();
 
-        $env = obtenerEnv();
-        $enlace = rtrim($env['APP_URL'] ?? '', '/') . '/restablecer-password.php?token=' . $tokenClaro;
+        $enlace = obtenerAppUrl() . '/restablecer-password.php?token=' . $tokenClaro;
 
         enviarCorreoTransaccional(
             $email,

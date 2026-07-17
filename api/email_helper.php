@@ -32,10 +32,10 @@ function leerRespuestaSmtp($socket): string
 function construirPlantillaInvitacion(string $nombre, string $enlaceInvitacion, string $email = ''): string
 {
     $env = obtenerEnv();
-    $appUrl = rtrim($env['APP_URL'] ?? '', '/');
     // URL absoluta real (nunca relativa) — los clientes de correo no tienen
     // noción del dominio del sitio, cargan la imagen directamente desde
-    // APP_URL del entorno activo.
+    // APP_URL del entorno activo (con fail-safe dinámico, ver obtenerAppUrl()).
+    $appUrl = obtenerAppUrl();
     $logoUrl = $appUrl . '/assets/img/logo3-removebg-preview.png';
     $enlaceHome = $appUrl . '/index.php';
     $enlaceClub = $appUrl . '/club-lectura.php';

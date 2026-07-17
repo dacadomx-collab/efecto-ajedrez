@@ -62,6 +62,34 @@ function obtenerEnv(): array
     return $env;
 }
 
+/**
+ * URL base absoluta del entorno activo, sin barra final — única fuente de
+ * verdad para construir enlaces de correo transaccional (invitación, reseteo
+ * de contraseña, check-in de sesión, logo). Nunca lleva una ruta de XAMPP ni
+ * un dominio de producción escrito como string literal en el código: siempre
+ * sale de `APP_URL` en `.env`.
+ *
+ * Fail-safe (Auditoría Perimetral 2026-07-17): si `APP_URL` no está
+ * inicializada en el `.env` del entorno activo, se calcula dinámicamente a
+ * partir de las variables globales de Apache (`HTTP_HOST` + protocolo real)
+ * en vez de fallar en silencio o arrastrar una ruta local hardcodeada.
+ */
+function obtenerAppUrl(): string
+{
+    $env = obtenerEnv();
+    $appUrl = rtrim((string) ($env['APP_URL'] ?? ''), '/');
+
+    if ($appUrl !== '') {
+        return $appUrl;
+    }
+
+    $esHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+
+    return ($esHttps ? 'https' : 'http') . '://' . $host;
+}
+
 function calcularIpHash(): string
 {
     return hash('sha256', $_SERVER['REMOTE_ADDR'] ?? '');

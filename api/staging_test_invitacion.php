@@ -28,7 +28,7 @@ requireAuth($pdo, ['super_admin']);
 // a una dirección inventada.
 $env = obtenerEnv();
 $tokenPreview = bin2hex(random_bytes(32));
-$enlacePreview = rtrim($env['APP_URL'] ?? '', '/') . '/invitacion.php?token=' . $tokenPreview;
+$enlacePreview = obtenerAppUrl() . '/invitacion.php?token=' . $tokenPreview;
 $correoAuditor = $env['SMTP_USER'] ?? '';
 
 if ($correoAuditor === '') {

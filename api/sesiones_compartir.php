@@ -166,7 +166,7 @@ try {
 
         // El correo lleva el enlace de Check-In, NUNCA el enlace crudo de la
         // videollamada directamente (MODULO_03_CRM_EVENTOS_EN_VIVO §3.1).
-        $enlaceCheckin = rtrim($env['APP_URL'] ?? '', '/') . '/checkin.php?token=' . $token;
+        $enlaceCheckin = obtenerAppUrl() . '/checkin.php?token=' . $token;
 
         $enviado = enviarCorreoTransaccional(
             $interesado['email'],

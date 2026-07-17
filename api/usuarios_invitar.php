@@ -81,8 +81,7 @@ try {
 
     $pdo->commit();
 
-    $env = obtenerEnv();
-    $enlaceInvitacion = rtrim($env['APP_URL'] ?? '', '/') . '/invitacion.php?token=' . $tokenClaro;
+    $enlaceInvitacion = obtenerAppUrl() . '/invitacion.php?token=' . $tokenClaro;
 
     $correoEnviado = enviarCorreoTransaccional(
         $email,
