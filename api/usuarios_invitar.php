@@ -51,6 +51,21 @@ $rolSolicitado = isset($payload['rol']) ? trim((string) $payload['rol']) : 'admi
 $rolNuevo = clamparRolSegunActor($rolSolicitado, (string) $actor['rol']);
 
 // CAPA 5 — Persistencia
+
+// Auditoría Perimetral 2026-07-18: el enlace de invitación se construye con
+// obtenerAppUrl() ANTES de tocar la BD — si el operador ejecuta esta acción
+// desde el entorno local (APP_URL=http://localhost/... en el .env local), el
+// correo se envía igual (SMTP es el mismo remoto) pero el enlace es
+// inalcanzable para el destinatario real. Bloqueo determinístico: solo se
+// permite enviar la invitación si el enlace resultante es HTTPS de
+// producción — evita repetir el incidente de invitación rota a un enlace
+// localhost.
+$appUrl = obtenerAppUrl();
+if (!str_starts_with($appUrl, 'https://')) {
+    error_log('[' . date('Y-m-d H:i:s') . '] usuarios_invitar.php: invitación bloqueada — APP_URL no es HTTPS de producción (' . $appUrl . ').' . PHP_EOL, 3, __DIR__ . '/../logs/error.log');
+    jsonResponse('error', 'No se puede enviar la invitación desde este entorno. Envía la invitación desde el Dashboard de producción (https://efecto-ajedrez.tourfindy.com).', [], 422);
+}
+
 try {
     $pdo->beginTransaction();
 
@@ -81,7 +96,7 @@ try {
 
     $pdo->commit();
 
-    $enlaceInvitacion = obtenerAppUrl() . '/invitacion.php?token=' . $tokenClaro;
+    $enlaceInvitacion = $appUrl . '/invitacion.php?token=' . $tokenClaro;
 
     $correoEnviado = enviarCorreoTransaccional(
         $email,
