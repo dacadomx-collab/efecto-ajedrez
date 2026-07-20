@@ -34,8 +34,18 @@ try {
     $parametros = [];
 
     if ($buscar !== '') {
-        $filtroWhere .= ' AND (u.nombre LIKE :buscar OR u.email LIKE :buscar OR la.ip_ciudad LIKE :buscar OR la.ip_estado LIKE :buscar OR la.ip_pais LIKE :buscar)';
-        $parametros[':buscar'] = '%' . $buscar . '%';
+        // PDO::ATTR_EMULATE_PREPARES=false (api/conexion.php) usa prepared
+        // statements nativos de MySQL, que no soportan reutilizar el mismo
+        // placeholder con nombre más de una vez en la misma consulta —
+        // provocaba un 500 en cualquier búsqueda. Un placeholder distinto
+        // por ocurrencia, mismo valor.
+        $filtroWhere .= ' AND (u.nombre LIKE :buscar1 OR u.email LIKE :buscar2 OR la.ip_ciudad LIKE :buscar3 OR la.ip_estado LIKE :buscar4 OR la.ip_pais LIKE :buscar5)';
+        $comodin = '%' . $buscar . '%';
+        $parametros[':buscar1'] = $comodin;
+        $parametros[':buscar2'] = $comodin;
+        $parametros[':buscar3'] = $comodin;
+        $parametros[':buscar4'] = $comodin;
+        $parametros[':buscar5'] = $comodin;
     }
 
     $stmtTotal = $pdo->prepare(
