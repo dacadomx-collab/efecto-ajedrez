@@ -30,7 +30,11 @@ if (mb_strlen($buscar) > 190) {
 
 // CAPA 5 — Persistencia
 try {
-    $filtroWhere = "la.evento = 'login_exitoso'";
+    // "Borrar" en este panel oculta (log_actividad_ocultos), nunca hace
+    // DELETE real -- log_actividad es una bitácora append-only bloqueada por
+    // trigger a nivel de BD (trg_log_actividad_no_delete). Se excluye aquí
+    // cualquier fila ya ocultada por un super_admin.
+    $filtroWhere = "la.evento = 'login_exitoso' AND o.log_actividad_id IS NULL";
     $parametros = [];
 
     if ($buscar !== '') {
@@ -49,7 +53,10 @@ try {
     }
 
     $stmtTotal = $pdo->prepare(
-        "SELECT COUNT(*) FROM log_actividad la LEFT JOIN usuarios u ON u.id = la.usuario_id WHERE {$filtroWhere}"
+        "SELECT COUNT(*) FROM log_actividad la
+         LEFT JOIN usuarios u ON u.id = la.usuario_id
+         LEFT JOIN log_actividad_ocultos o ON o.log_actividad_id = la.id
+         WHERE {$filtroWhere}"
     );
     $stmtTotal->execute($parametros);
     $total = (int) $stmtTotal->fetchColumn();
@@ -62,6 +69,7 @@ try {
         "SELECT la.id, la.evento, la.ip, la.ip_pais, la.ip_estado, la.ip_ciudad, la.created_at, u.nombre, u.email
          FROM log_actividad la
          LEFT JOIN usuarios u ON u.id = la.usuario_id
+         LEFT JOIN log_actividad_ocultos o ON o.log_actividad_id = la.id
          WHERE {$filtroWhere}
          ORDER BY la.created_at DESC
          LIMIT " . REGISTROS_POR_PAGINA . " OFFSET {$offset}"

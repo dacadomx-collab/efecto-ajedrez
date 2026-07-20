@@ -32,11 +32,27 @@ if (!in_array($modo, ['seleccionados', 'cantidad', 'todos'], true)) {
 }
 
 // CAPA 5 — Persistencia
+//
+// "Borrar" aquí nunca hace DELETE real sobre log_actividad: esa tabla es una
+// bitácora append-only con un trigger a nivel de BD
+// (trg_log_actividad_no_delete) que rechaza cualquier DELETE, a propósito
+// (ni un super_admin puede borrar el rastro de accesos). En vez de eso, se
+// inserta el id en log_actividad_ocultos — la fila original permanece
+// intacta para auditoría real, y registro_ingreso_listar.php la excluye de
+// la vista. INSERT IGNORE evita error de clave duplicada si un registro ya
+// estaba oculto.
 try {
     $eliminados = 0;
+    $actorId = (int) $actor['id'];
 
     if ($modo === 'todos') {
-        $stmt = $pdo->prepare("DELETE FROM log_actividad WHERE evento = 'login_exitoso'");
+        $stmt = $pdo->prepare(
+            "INSERT IGNORE INTO log_actividad_ocultos (log_actividad_id, ocultado_por)
+             SELECT la.id, :actor FROM log_actividad la
+             LEFT JOIN log_actividad_ocultos o ON o.log_actividad_id = la.id
+             WHERE la.evento = 'login_exitoso' AND o.log_actividad_id IS NULL"
+        );
+        $stmt->bindValue(':actor', $actorId, PDO::PARAM_INT);
         $stmt->execute();
         $eliminados = $stmt->rowCount();
     } elseif ($modo === 'cantidad') {
@@ -46,12 +62,16 @@ try {
             jsonResponse('error', 'Cantidad inválida.', [], 422);
         }
 
-        // Elimina los registros más antiguos primero — conserva la
+        // Oculta los registros visibles más antiguos primero — conserva la
         // auditoría más reciente, que es la de mayor valor operativo.
         $stmt = $pdo->prepare(
-            "DELETE FROM log_actividad WHERE evento = 'login_exitoso'
-             ORDER BY created_at ASC LIMIT :cantidad"
+            "INSERT IGNORE INTO log_actividad_ocultos (log_actividad_id, ocultado_por)
+             SELECT la.id, :actor FROM log_actividad la
+             LEFT JOIN log_actividad_ocultos o ON o.log_actividad_id = la.id
+             WHERE la.evento = 'login_exitoso' AND o.log_actividad_id IS NULL
+             ORDER BY la.created_at ASC LIMIT :cantidad"
         );
+        $stmt->bindValue(':actor', $actorId, PDO::PARAM_INT);
         $stmt->bindValue(':cantidad', $cantidad, PDO::PARAM_INT);
         $stmt->execute();
         $eliminados = $stmt->rowCount();
@@ -64,12 +84,17 @@ try {
         }
 
         $marcadores = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $pdo->prepare("DELETE FROM log_actividad WHERE evento = 'login_exitoso' AND id IN ({$marcadores})");
-        $stmt->execute(array_values($ids));
+        $stmt = $pdo->prepare(
+            "INSERT IGNORE INTO log_actividad_ocultos (log_actividad_id, ocultado_por)
+             SELECT la.id, ? FROM log_actividad la
+             LEFT JOIN log_actividad_ocultos o ON o.log_actividad_id = la.id
+             WHERE la.evento = 'login_exitoso' AND o.log_actividad_id IS NULL AND la.id IN ({$marcadores})"
+        );
+        $stmt->execute(array_merge([$actorId], array_values($ids)));
         $eliminados = $stmt->rowCount();
     }
 
-    registrarActividad($pdo, (int) $actor['id'], 'registro_ingreso_purgado', "modo={$modo}, eliminados={$eliminados}");
+    registrarActividad($pdo, $actorId, 'registro_ingreso_ocultado', "modo={$modo}, ocultados={$eliminados}");
 
     jsonResponse('success', $eliminados . ' registro(s) eliminado(s) del historial de accesos.', ['eliminados' => $eliminados]);
 } catch (PDOException $e) {
