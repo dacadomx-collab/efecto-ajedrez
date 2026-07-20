@@ -133,6 +133,18 @@ function resolverGeoIp(string $ip): array
     ];
 }
 
+/**
+ * Auditoría Perimetral 2026-07-20 — Incidente "bucle de login": este hash ya
+ * NO incluye REMOTE_ADDR. La IP visible del cliente cambia legítimamente a
+ * mitad de una sesión válida en redes CGNAT de operadores móviles y en
+ * balanceadores del hosting compartido (confirmado en producción: dos
+ * peticiones consecutivas del mismo usuario, sin cambiar de red, llegaron
+ * con IP distinta). Atar la validez de la sesión a esa IP volátil invalidaba
+ * tokens 100% vigentes y forzaba a la usuaria de vuelta al login en bucle.
+ * El token opaco de 256 bits (random_bytes) ya es la defensa real contra
+ * session fixation/robo de sesión; el User-Agent se conserva como huella
+ * blanda adicional, estable dentro de una misma sesión de navegador.
+ */
 function calcularDeviceHash(): string
 {
     $env = obtenerEnv();
@@ -141,10 +153,9 @@ function calcularDeviceHash(): string
     // la .env real, se usa DB_PASS como respaldo — nunca cadena vacía.
     $pepper = $env['JWT_SECRET'] ?? $env['DB_PASS'] ?? '';
 
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
     $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
 
-    return hash('sha256', $ip . '|' . $userAgent . '|' . $pepper);
+    return hash('sha256', $userAgent . '|' . $pepper);
 }
 
 /**
